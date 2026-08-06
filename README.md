@@ -13,41 +13,84 @@
 
 ---
 
-## 一、先做這三件事（不做的話網站打不開資料）
+## 一、先做這四件事（不做的話網站打不開資料）
 
-### 1. 貼上 Firebase 設定
+### 1. 把 Firebase 設定放進 GitHub Secret
 
-編輯 [`assets/js/firebase-config.js`](assets/js/firebase-config.js)，把 Firebase 主控台
-**專案設定 → 一般 → 你的應用程式 → SDK 設定和配置** 那段 `firebaseConfig` 整個貼進去覆蓋。
+設定值不進版控 —— `assets/js/firebase-config.js` 已列在 `.gitignore`，
+線上版本由 [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) 在部署時產生。
 
-務必確認裡面有 **`databaseURL`** 這一行（Realtime Database 才需要，Firestore 的設定不會附）。
-如果沒有，到 **建構 → Realtime Database** 頁面上方複製資料庫網址補上。
+GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**：
 
-> 這些金鑰本來就會被瀏覽器下載，不是機密。真正的保護在下面的安全性規則。
+- Name：`FIREBASE_CONFIG`
+- Secret：把設定寫成 **一行 JSON**（鍵名要加雙引號）
+
+```json
+{"apiKey":"AIza...","authDomain":"xxx.firebaseapp.com","databaseURL":"https://xxx-default-rtdb.asia-southeast1.firebasedatabase.app","projectId":"xxx","storageBucket":"xxx.appspot.com","messagingSenderId":"123456789","appId":"1:123:web:abc"}
+```
+
+值在 Firebase 主控台 **專案設定 → 一般 → 你的應用程式 → SDK 設定和配置**。
+務必確認有 **`databaseURL`** 這一行（主控台複製的那段有時不含它，
+要去 **建構 → Realtime Database** 頁面上方另外複製）。
+
+本機測試的話另外複製一份：
+
+```
+copy assets\js\firebase-config.example.js assets\js\firebase-config.js
+```
+
+> ⚠️ 這樣做只是讓設定值不出現在 git 紀錄裡。**它仍然會出現在部署後的網頁上** ——
+> Firebase 前端 SDK 一定要把金鑰送到瀏覽器才能連線，任何人按 F12 都看得到，
+> 這是設計上就無法避免的。所以安全性完全靠下面的第 2、3 步，不要靠藏金鑰。
 
 ### 2. 貼上資料庫安全性規則
 
 Firebase 主控台 → **Realtime Database → 規則**，把
 [`database.rules.json`](database.rules.json) 的內容整份貼上並發布。
 
-這份規則做到三件事：
+這份規則做到四件事：
 
 - **正解不會外流**：`/answerKey/{題號}` 平常任何人都讀不到，只有主持人按下「公布答案」
   （寫入 `state/revealed/{題號} = true`）之後才變成可讀。學生開開發者工具也偷不到。
 - **截止後不能補答**：`/responses` 只有在 `state.phase === "open"` 且題號相符時才寫得進去。
-- **只有主持人能改題目、改狀態、看原始作答紀錄。**
+- **答案格式受檢查**：只收 A/B/C/D，而且組別必須真的存在。
+- **只有名單上的 UID 能改題目、改狀態、看原始作答紀錄** —— 見下一步。
 
-### 3. 建立主持人帳號
+### 3. 建立主持人帳號，並把 UID 加進白名單
 
-Firebase 主控台 → **Authentication → 登入方式** 啟用「電子郵件/密碼」，
-再到 **使用者 → 新增使用者** 建一組帳號密碼。這組帳號同時用於 `host.html` 和 `admin.html`。
+**這一步不能跳過。** 因為 API 金鑰是公開的，只要啟用了 Email/Password 登入方式，
+任何人都能拿你的金鑰自己註冊一個帳號。所以規則不是看「有沒有登入」，
+而是看「這個 UID 有沒有在 `/admins` 名單上」。
+
+1. Firebase 主控台 → **Authentication → 登入方式** 啟用「電子郵件/密碼」。
+2. **使用者 → 新增使用者**，建一組帳號密碼，複製那一列的 **使用者 UID**。
+3. **Realtime Database → 資料**，在根目錄手動新增：
+
+   ```
+   admins
+     └─ 剛才複製的UID :  true      （型別選 boolean）
+   ```
+
+4. 順手把 **Authentication → 設定 → 使用者動作** 裡的
+   **「啟用建立帳戶（註冊）」關掉**，讓外人連註冊都做不到。
+
+這組帳號 `host.html`、`admin.html`、`screen.html` 共用。
+沒在名單上的帳號登入後會被立刻登出，並顯示自己的 UID 方便你補進名單。
+
+### 4.（建議）限制 API 金鑰的來源網域
+
+Google Cloud Console → **API 和服務 → 憑證 → 你的瀏覽器金鑰 → 應用程式限制**
+選「HTTP 參照網址」，加入 `ntustcdvc1979.github.io/*`。
+這樣就算金鑰被抄走，也沒辦法從別的網站拿來用。
 
 ---
 
 ## 二、開啟 GitHub Pages
 
-GitHub repo → **Settings → Pages** → Source 選 `Deploy from a branch`，
-Branch 選 `main` / `/ (root)` → Save。等一兩分鐘網址就會生效。
+GitHub repo → **Settings → Pages** → Source 選 **`GitHub Actions`**（不是 Deploy from a branch）。
+
+之後每次 push 到 `main`，Actions 會自動把 secret 寫進 `firebase-config.js` 再部署。
+第一次可以到 **Actions** 分頁看有沒有跑成功；如果 secret 沒建好，工作流程會直接失敗並告訴你原因。
 
 ---
 
@@ -121,10 +164,12 @@ host.html               主持人控制台
 screen.html             投影統計頁（16:9）
 admin.html              題目／組別後台
 database.rules.json     Realtime Database 安全性規則
+.github/workflows/deploy.yml   部署時注入 Firebase 設定並發布 Pages
 assets/
   css/style.css         全站樣式（深藍星空 + 金色 + 霓虹 ABCD）
-  js/firebase-config.js ← 要填的地方
-  js/common.js          Firebase 初始化、路徑、計分邏輯
+  js/firebase-config.example.js  範本
+  js/firebase-config.js          本機用，不進版控（.gitignore）
+  js/common.js          Firebase 初始化、路徑、權限檢查、計分邏輯
   js/player.js  host.js  screen.js  admin.js
   img/hero.jpg  logo.png
 ```
@@ -132,6 +177,7 @@ assets/
 ## 七、資料庫結構
 
 ```
+/admins/{uid}             true                             ← 主持人白名單，只能從主控台手動改
 /config/groups/{gid}      { name, order }
 /questions/{qid}          { order, text, a, b, c, d }      ← 公開可讀，不含正解
 /answerKey/{qid}          "A"                              ← 公布後才可讀
@@ -146,6 +192,8 @@ assets/
 
 ## 八、已知限制
 
+- **Firebase 金鑰一定是公開的。** 它會隨網頁下載到每支手機，藏不住。
+  安全性靠的是資料庫規則 + `/admins` 白名單 + 關閉自行註冊，不是靠金鑰保密。
 - 以「一支手機一筆答案」計算，同組多人各自作答。沒有登入驗證，
   同一個人換裝置或清除瀏覽器資料會被當成新的人。這對迎新活動的規模是可接受的。
 - 沒有防止有人手動改別人裝置的答案（需要知道對方的隨機 id 才做得到，機率極低）。

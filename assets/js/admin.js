@@ -5,7 +5,7 @@
 import {
   db, auth, ref, onValue, set, update, remove,
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
-  PATH, LETTERS, $, show, toast, toSortedList, escapeHtml
+  PATH, LETTERS, $, show, toast, toSortedList, escapeHtml, isHost
 } from "./common.js";
 
 let groups = {}, questions = {}, keys = {};
@@ -13,10 +13,18 @@ let editing = null;            // 正在編輯的題目 id；"new" 代表新增
 let booted = false;
 
 // ---------- 登入 ----------
-onAuthStateChanged(auth, user => {
-  show($("#scr-login"), !user);
-  show($("#scr-main"),  !!user);
-  if (user && !booted) { booted = true; attach(); }
+onAuthStateChanged(auth, async user => {
+  const ok = await isHost(user);
+  show($("#scr-login"), !ok);
+  show($("#scr-main"),   ok);
+
+  if (user && !ok) {
+    $("#login-msg").textContent =
+      `「${user.email}」不在主持人名單裡。請在 Realtime Database 的 /admins 底下新增這組 UID：${user.uid}`;
+    await signOut(auth);
+    return;
+  }
+  if (ok && !booted) { booted = true; attach(); }
 });
 
 $("#btn-login").addEventListener("click", doLogin);

@@ -3,19 +3,25 @@
     ".read": false,
     ".write": false,
 
+    "admins": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+
     "config": {
       ".read": true,
-      ".write": "auth != null"
+      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
 
     "questions": {
       ".read": true,
-      ".write": "auth != null"
+      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
 
     "answerKey": {
-      ".read": "auth != null",
-      ".write": "auth != null",
+      ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
+      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true",
       "$qid": {
         ".read": "root.child('state/revealed').child($qid).val() === true",
         ".validate": "newData.isString() && newData.val().matches(/^[ABCD]$/)"
@@ -24,26 +30,26 @@
 
     "state": {
       ".read": true,
-      ".write": "auth != null"
+      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
 
     "stats": {
       ".read": true,
-      ".write": "auth != null"
+      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
 
     "leaderboard": {
       ".read": true,
-      ".write": "auth != null"
+      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
 
     "responses": {
-      ".read": "auth != null",
-      ".write": "auth != null",
+      ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
+      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true",
       "$qid": {
         "$cid": {
-          ".write": "auth != null || (root.child('state/phase').val() === 'open' && root.child('state/qid').val() === $qid)",
-          ".validate": "newData.hasChildren(['g','c']) && newData.child('c').isString() && newData.child('c').val().matches(/^[ABCD]$/) && root.child('config/groups').child(newData.child('g').val()).exists()",
+          ".write": "root.child('state/phase').val() === 'open' && root.child('state/qid').val() === $qid",
+          ".validate": "newData.hasChildren(['g','c']) && root.child('config/groups').child(newData.child('g').val()).exists()",
           "g": { ".validate": "newData.isString()" },
           "c": { ".validate": "newData.isString() && newData.val().matches(/^[ABCD]$/)" },
           "t": { ".validate": "newData.isNumber()" },

@@ -1,0 +1,10 @@
+# Firebase 設定不進版控。
+# 本機測試時自己複製一份：
+#   copy assets\js\firebase-config.example.js assets\js\firebase-config.js
+# 線上版本由 .github/workflows/deploy.yml 從 repo secret 產生。
+assets/js/firebase-config.js
+
+# 系統雜項
+.DS_Store
+Thumbs.db
+desktop.ini

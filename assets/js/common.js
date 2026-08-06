@@ -30,6 +30,7 @@ export {
 //  /stats/{qid}              = { A,B,C,D, total, key }         ← 公布後由主持人寫入
 //  /leaderboard              = { updatedAt, rows:[{gid,name,answered,correct,rate}] }
 export const PATH = {
+  admins:     "admins",
   groups:     "config/groups",
   questions:  "questions",
   answerKey:  "answerKey",
@@ -59,6 +60,22 @@ export function clientId() {
     localStorage.setItem("cdf_client", id);
   }
   return id;
+}
+
+/**
+ * 這個帳號是不是主持人。
+ * 光是「登入成功」不代表有權限 —— 必須在資料庫的 /admins/{uid} 被列名。
+ * 因為 Firebase 的 API 金鑰是公開的，只要開放了 Email/Password 登入方式，
+ * 任何人都能自己註冊一個帳號；真正的門檻在這裡。
+ */
+export async function isHost(user) {
+  if (!user) return false;
+  try {
+    const snap = await get(ref(db, `${PATH.admins}/${user.uid}`));
+    return snap.val() === true;
+  } catch {
+    return false;
+  }
 }
 
 export const $  = (sel, root = document) => root.querySelector(sel);

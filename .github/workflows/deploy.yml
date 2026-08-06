@@ -1,0 +1,57 @@
+name: 部署到 GitHub Pages
+
+# 部署時才把 Firebase 設定寫進 firebase-config.js，
+# 所以設定值不會出現在 git 紀錄裡。
+# 需要先到 Settings → Secrets and variables → Actions 建立
+# 名為 FIREBASE_CONFIG 的 secret，內容是一段 JSON，例如：
+#   {"apiKey":"AIza...","authDomain":"xxx.firebaseapp.com",
+#    "databaseURL":"https://xxx-default-rtdb.asia-southeast1.firebasedatabase.app",
+#    "projectId":"xxx","storageBucket":"xxx.appspot.com",
+#    "messagingSenderId":"123456789","appId":"1:123:web:abc"}
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 產生 firebase-config.js
+        env:
+          FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
+        run: |
+          if [ -z "$FIREBASE_CONFIG" ]; then
+            echo "::error::找不到 FIREBASE_CONFIG secret。請到 Settings → Secrets and variables → Actions 建立。"
+            exit 1
+          fi
+          if ! printf '%s' "$FIREBASE_CONFIG" | python3 -c 'import json,sys; json.load(sys.stdin)'; then
+            echo "::error::FIREBASE_CONFIG 不是合法的 JSON。請確認是 {\"apiKey\":\"...\"} 這種格式，鍵名要加雙引號。"
+            exit 1
+          fi
+          printf 'export const firebaseConfig = %s;\n' "$FIREBASE_CONFIG" > assets/js/firebase-config.js
+          echo "已產生 firebase-config.js"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

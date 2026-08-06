@@ -6,7 +6,7 @@ import {
   db, auth, ref, onValue, set, update, remove,
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
   PATH, PHASE, LETTERS, $, show, toast, toSortedList, escapeHtml,
-  tallyQuestion, buildLeaderboard
+  isHost, tallyQuestion, buildLeaderboard
 } from "./common.js";
 
 let groups = {}, questions = {}, keys = {}, allResp = {}, state = {};
@@ -24,10 +24,18 @@ const PHASE_LABEL = {
 // ------------------------------------------------------------
 //  登入
 // ------------------------------------------------------------
-onAuthStateChanged(auth, user => {
-  show($("#scr-login"),   !user);
-  show($("#scr-console"),  !!user);
-  if (user) {
+onAuthStateChanged(auth, async user => {
+  const ok = await isHost(user);
+  show($("#scr-login"),   !ok);
+  show($("#scr-console"),  ok);
+
+  if (user && !ok) {
+    $("#login-msg").textContent =
+      `「${user.email}」不在主持人名單裡。請在 Realtime Database 的 /admins 底下新增這組 UID：${user.uid}`;
+    await signOut(auth);
+    return;
+  }
+  if (ok) {
     $("#tag-who").textContent = user.email;
     if (!booted) { booted = true; attach(); }
   }

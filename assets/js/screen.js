@@ -6,7 +6,7 @@
 
 import {
   db, auth, ref, onValue, onAuthStateChanged,
-  PATH, PHASE, LETTERS, $, escapeHtml, toSortedList, tallyQuestion, buildLeaderboard
+  PATH, PHASE, LETTERS, $, escapeHtml, toSortedList, isHost, tallyQuestion, buildLeaderboard
 } from "./common.js";
 
 let groups = {}, questions = {}, keys = {}, allResp = {}, state = {}, board = null;
@@ -16,8 +16,8 @@ const body  = $("#s-body");
 const badge = $("#s-badge");
 const foot  = $("#s-phase");
 
-onAuthStateChanged(auth, user => {
-  if (!user) {
+onAuthStateChanged(auth, async user => {
+  if (!await isHost(user)) {
     body.innerHTML = `<div class="card center stack" style="max-width:60vw; margin:0 auto;">
       <h2 class="title-gold" style="font-size:4vh; margin:0;">尚未登入</h2>
       <p class="hint" style="font-size:2.2vh;">請先在同一個瀏覽器開啟
