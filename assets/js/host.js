@@ -4,9 +4,9 @@
 
 import {
   db, auth, ref, onValue, set, update, remove,
-  signInWithEmailAndPassword, signOut, onAuthStateChanged,
+  signInWithGoogle, consumeRedirectResult, authErrorText, signOut, onAuthStateChanged,
   PATH, PHASE, LETTERS, $, show, toast, toSortedList, escapeHtml,
-  isHost, tallyQuestion, buildLeaderboard
+  isHost, notHostHtml, tallyQuestion, buildLeaderboard
 } from "./common.js";
 
 let groups = {}, questions = {}, keys = {}, allResp = {}, state = {};
@@ -30,8 +30,7 @@ onAuthStateChanged(auth, async user => {
   show($("#scr-console"),  ok);
 
   if (user && !ok) {
-    $("#login-msg").textContent =
-      `「${user.email}」不在主持人名單裡。請在 Realtime Database 的 /admins 底下新增這組 UID：${user.uid}`;
+    $("#login-msg").innerHTML = notHostHtml(user);
     await signOut(auth);
     return;
   }
@@ -41,20 +40,20 @@ onAuthStateChanged(auth, async user => {
   }
 });
 
-$("#btn-login").addEventListener("click", doLogin);
-$("#in-pass").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+// 從 Google 轉址回來的情況
+consumeRedirectResult().then(e => { if (e) $("#login-msg").textContent = authErrorText(e); });
 
-async function doLogin() {
-  const email = $("#in-email").value.trim();
-  const pass  = $("#in-pass").value;
-  if (!email || !pass) return;
+$("#btn-login").addEventListener("click", async () => {
+  $("#btn-login").disabled = true;
   $("#login-msg").textContent = "登入中…";
   try {
-    await signInWithEmailAndPassword(auth, email, pass);
+    await signInWithGoogle();
   } catch (e) {
-    $("#login-msg").textContent = "登入失敗：" + (e.code || e.message);
+    $("#login-msg").textContent = authErrorText(e);
+  } finally {
+    $("#btn-login").disabled = false;
   }
-}
+});
 
 $("#btn-logout").addEventListener("click", () => signOut(auth).then(() => location.reload()));
 

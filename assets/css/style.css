@@ -220,6 +220,7 @@ code {
   transition: transform .1s ease, box-shadow .1s ease;
 }
 .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #9b6a00, 0 0 14px rgba(255,200,31,.4); }
+.btn svg { flex: 0 0 auto; }   /* 窄螢幕上不要把圖示壓扁 */
 .btn:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; transform: none; }
 .btn.wide { width: 100%; }
 .btn.ghost {

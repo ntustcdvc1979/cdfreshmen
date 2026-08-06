@@ -7,7 +7,8 @@ import {
   getDatabase, ref, onValue, get, set, update, remove, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
+  getRedirectResult, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
 import { firebaseConfig } from "./firebase-config.js";
@@ -18,8 +19,59 @@ export const auth = getAuth(app);
 
 export {
   ref, onValue, get, set, update, remove, serverTimestamp,
-  signInWithEmailAndPassword, signOut, onAuthStateChanged
+  signOut, onAuthStateChanged
 };
+
+/**
+ * 用 Google 帳號登入。
+ * 優先用彈出視窗；被瀏覽器擋掉或環境不支援時，退回整頁轉址。
+ */
+export async function signInWithGoogle() {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (e) {
+    // 使用者自己關掉視窗就不要再轉址，其餘擋不住的情況才退回整頁登入
+    const fallback = [
+      "auth/popup-blocked",
+      "auth/cancelled-popup-request",
+      "auth/operation-not-supported-in-this-environment"
+    ];
+    if (fallback.includes(e?.code)) { await signInWithRedirect(auth, provider); return; }
+    throw e;
+  }
+}
+
+/** 頁面載入時處理轉址回來的結果；沒有轉址就什麼也不做 */
+export async function consumeRedirectResult() {
+  try { await getRedirectResult(auth); } catch (e) { return e; }
+  return null;
+}
+
+/**
+ * 登入成功、但不在主持人名單上時要顯示的說明。
+ * 把 UID 直接秀出來，方便複製貼到 Firebase 主控台。
+ */
+export function notHostHtml(user) {
+  return `「${escapeHtml(user.email || user.uid)}」不在主持人名單裡。<br>
+    請到 Firebase 主控台 → Realtime Database，在 <code>admins</code> 底下新增這組 UID（值填 <code>true</code>）：<br>
+    <code style="user-select:all; display:inline-block; margin-top:6px; font-size:14px;">${escapeHtml(user.uid)}</code>`;
+}
+
+/** 把 Firebase 的錯誤碼翻成看得懂的中文 */
+export function authErrorText(e) {
+  const code = e?.code || "";
+  const map = {
+    "auth/popup-closed-by-user":   "登入視窗被關閉了，請再試一次。",
+    "auth/popup-blocked":          "瀏覽器擋掉了登入視窗，請允許彈出視窗後再試。",
+    "auth/unauthorized-domain":    "這個網域還沒被授權。請到 Firebase 主控台 → Authentication → 設定 → 授權網域，加入 " + location.hostname + "。",
+    "auth/operation-not-allowed":  "Google 登入方式還沒啟用。請到 Firebase 主控台 → Authentication → 登入方式 啟用 Google。",
+    "auth/admin-restricted-operation": "這個 Google 帳號還沒有帳號，而專案已關閉自行註冊。請先在 Firebase 主控台把它加為使用者。",
+    "auth/network-request-failed":  "網路連線失敗，請確認網路後再試。"
+  };
+  return map[code] || ("登入失敗：" + (code || e?.message || "未知錯誤"));
+}
 
 // ---------- 資料庫路徑 ----------
 //  /config/groups/{gid}      = { name, order }
