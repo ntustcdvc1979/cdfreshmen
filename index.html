@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#00043f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>大學星攻略｜創造我的大學價值</title>
+<link rel="icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <img class="logo" src="assets/img/logo.png" alt="大學星攻略">
+
+  <!-- ===== 1. 選組別 ===== -->
+  <section id="scr-group" class="stack hidden">
+    <img class="hero" src="assets/img/hero.jpg" alt="大學星攻略 — 創造我的大學價值">
+    <div class="card stack">
+      <div class="field">
+        <label for="sel-group">請選擇你的組別</label>
+        <select id="sel-group"><option value="">載入中…</option></select>
+      </div>
+      <button id="btn-join" class="btn wide" disabled>進入遊戲 ★</button>
+      <p class="hint">選錯了？進場後點右上角組別可以重選。</p>
+    </div>
+  </section>
+
+  <!-- ===== 2. 等待中 ===== -->
+  <section id="scr-wait" class="stack hidden" style="flex:1 1 auto; justify-content:center; align-content:center;">
+    <div class="center stack">
+      <div class="spin"></div>
+      <h2 class="title-gold" style="font-size:26px; margin:6px 0;">等待主持人出題</h2>
+      <p class="hint" id="wait-msg">請把手機拿好，題目馬上就來 ✦</p>
+      <div class="center"><span class="pill" id="wait-group">—</span></div>
+    </div>
+    <div class="spacer"></div>
+    <button id="btn-regroup" class="btn ghost">重新選擇組別</button>
+  </section>
+
+  <!-- ===== 3. 作答 ===== -->
+  <section id="scr-question" class="stack hidden">
+    <div class="center"><span class="qbadge">第 <b id="q-no">1</b> 題</span></div>
+
+    <div class="qpanel"><p id="q-text">…</p></div>
+
+    <div class="opts" id="opts"></div>
+
+    <div class="center" style="margin-top:16px;">
+      <span class="pill live"   id="tag-open">開放作答中</span>
+      <span class="pill lock hidden" id="tag-lock">已截止作答</span>
+    </div>
+    <p class="hint" id="q-hint" style="margin-top:10px;">選好之後就送出，主持人公布前答案不會顯示。</p>
+  </section>
+
+  <!-- ===== 4. 公布答案 ===== -->
+  <section id="scr-reveal" class="stack hidden">
+    <div class="center"><span class="qbadge">第 <b id="r-no">1</b> 題</span></div>
+    <h2 class="title-gold center" style="font-size:26px; margin:14px 0 0;">🎉 正確答案 🎉</h2>
+    <div class="reveal-letter" id="r-letter">A</div>
+    <div class="center"><span class="verdict" id="r-verdict">—</span></div>
+    <div class="card stack" style="margin-top:18px;">
+      <p class="hint" style="margin:0 0 4px;">全場作答分布</p>
+      <div class="bars" id="r-bars"></div>
+    </div>
+    <p class="hint" style="margin-top:14px;">等待主持人進入下一題…</p>
+  </section>
+
+  <!-- ===== 5. 最終排行 ===== -->
+  <section id="scr-final" class="stack hidden">
+    <h2 class="title-gold center" style="font-size:30px; margin:10px 0 2px;">★ 最終排行榜 ★</h2>
+    <p class="hint" style="margin:0 0 14px;">依各組答對率排名</p>
+    <div class="card">
+      <table class="rank">
+        <thead><tr><th style="width:44px;">#</th><th>組別</th><th class="n">答對率</th><th class="n">答對</th></tr></thead>
+        <tbody id="final-rows"></tbody>
+      </table>
+    </div>
+    <p class="hint" style="margin-top:18px;">感謝參與 —— 崇德志工社</p>
+  </section>
+
+  <!-- ===== 錯誤 ===== -->
+  <section id="scr-error" class="stack hidden">
+    <div class="card stack center">
+      <h2 class="title-gold" style="font-size:22px; margin:0;">連線發生問題</h2>
+      <p class="hint" id="err-msg">請確認網路後重新整理頁面。</p>
+      <button class="btn" onclick="location.reload()">重新載入</button>
+    </div>
+  </section>
+
+</div>
+
+<script type="module" src="assets/js/player.js"></script>
+</body>
+</html>

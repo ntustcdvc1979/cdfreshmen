@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#00043f">
+<meta name="robots" content="noindex">
+<title>主持人控制台｜大學星攻略</title>
+<link rel="icon" href="assets/img/logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="wrap wide">
+
+  <img class="logo" src="assets/img/logo.png" alt="大學星攻略">
+  <p class="hint" style="margin:0 0 14px;">主持人控制台</p>
+
+  <!-- ===== 登入 ===== -->
+  <section id="scr-login" class="stack hidden">
+    <div class="card stack">
+      <div class="field">
+        <label for="in-email">主持人帳號（Email）</label>
+        <input id="in-email" type="email" autocomplete="username" placeholder="host@example.com">
+      </div>
+      <div class="field">
+        <label for="in-pass">密碼</label>
+        <input id="in-pass" type="password" autocomplete="current-password">
+      </div>
+      <button id="btn-login" class="btn wide">登入</button>
+      <p class="hint" id="login-msg">帳號請在 Firebase 主控台 → Authentication 建立。</p>
+    </div>
+  </section>
+
+  <!-- ===== 控制台 ===== -->
+  <section id="scr-console" class="stack hidden">
+
+    <div class="card stack">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <span class="pill" id="tag-phase">待機中</span>
+        <span class="hint" id="tag-who" style="text-align:right;"></span>
+      </div>
+
+      <div class="field">
+        <label for="sel-q">目前題目</label>
+        <select id="sel-q"><option>載入中…</option></select>
+      </div>
+
+      <div class="row">
+        <button id="btn-open"   class="btn"        style="flex:1 1 140px;">▶ 出題／開放作答</button>
+        <button id="btn-lock"   class="btn ghost"  style="flex:1 1 140px;">■ 截止作答</button>
+        <button id="btn-reveal" class="btn"        style="flex:1 1 140px;">🎉 公布答案</button>
+      </div>
+      <div class="row">
+        <button id="btn-prev"  class="btn ghost" style="flex:1 1 110px;">← 上一題</button>
+        <button id="btn-next"  class="btn ghost" style="flex:1 1 110px;">下一題 →</button>
+        <button id="btn-idle"  class="btn ghost" style="flex:1 1 110px;">回到待機畫面</button>
+        <button id="btn-final" class="btn"       style="flex:1 1 160px;">🏆 結束並公布排行榜</button>
+      </div>
+    </div>
+
+    <!-- 即時統計 -->
+    <div class="card stack">
+      <div class="row" style="justify-content:space-between; align-items:baseline;">
+        <strong class="title-gold" style="font-size:19px;">即時作答狀況</strong>
+        <span class="hint" id="live-count">0 人已作答</span>
+      </div>
+      <p id="live-q" class="hint" style="text-align:left; margin:0;">—</p>
+      <div class="bars" id="live-bars"></div>
+      <p class="hint" style="text-align:left; margin:6px 0 0;">正解：<b id="live-key" style="color:var(--gold)">—</b>（只有你看得到，學生端要按「公布答案」才讀得到）</p>
+    </div>
+
+    <!-- 各組進度 -->
+    <div class="card">
+      <strong class="title-gold" style="font-size:19px;">各組即時排名（依答對率）</strong>
+      <table class="rank" style="margin-top:10px;">
+        <thead><tr><th style="width:44px;">#</th><th>組別</th><th class="n">答對率</th><th class="n">答對</th><th class="n">本題已答</th></tr></thead>
+        <tbody id="rank-rows"></tbody>
+      </table>
+    </div>
+
+    <div class="card stack">
+      <strong class="title-gold" style="font-size:19px;">其他</strong>
+      <div class="row">
+        <a class="btn ghost" href="screen.html" target="_blank" rel="noopener">🖥 開啟投影統計頁</a>
+        <a class="btn ghost" href="admin.html" target="_blank" rel="noopener">✎ 題目／組別後台</a>
+        <button id="btn-qr" class="btn ghost">📱 顯示玩家端 QR Code</button>
+      </div>
+      <div class="row">
+        <button id="btn-reset"  class="btn danger">⟲ 清除所有作答紀錄</button>
+        <button id="btn-logout" class="btn ghost">登出</button>
+      </div>
+      <p class="hint" style="text-align:left; margin:0;">「清除所有作答紀錄」只在活動前測試完使用，會把所有人的答案、統計與排行榜全部刪除。</p>
+    </div>
+
+  </section>
+
+  <!-- QR 對話框 -->
+  <div id="qr-box" class="card stack center hidden" style="position:fixed; inset:auto 16px 16px 16px; max-width:420px; margin:0 auto; z-index:50;">
+    <strong class="title-gold" style="font-size:20px;">請學生掃描進場</strong>
+    <img id="qr-img" alt="玩家端 QR Code" style="width:220px; height:220px; margin:0 auto; background:#fff; border-radius:10px; padding:8px;">
+    <p class="hint" id="qr-url" style="word-break:break-all;"></p>
+    <button id="btn-qr-close" class="btn ghost">關閉</button>
+  </div>
+
+</div>
+
+<script type="module" src="assets/js/host.js"></script>
+</body>
+</html>

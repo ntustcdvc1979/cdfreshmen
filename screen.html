@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>投影統計｜大學星攻略</title>
+<link rel="icon" href="assets/img/logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  /* 投影用：固定 16:9，字級隨畫面縮放，直接對應 Canva 簡報的比例 */
+  html, body { height: 100%; overflow: hidden; }
+  .stage {
+    position: relative;
+    width: 100vw; height: 100vh;
+    display: flex; flex-direction: column;
+    padding: 3.2vh 4vw;
+    font-size: 1.85vh;
+  }
+  .stage .logo { width: 22vh; margin: 0; -webkit-mask-image: radial-gradient(ellipse 62% 62% at 50% 50%, #000 58%, transparent 100%); mask-image: radial-gradient(ellipse 62% 62% at 50% 50%, #000 58%, transparent 100%); }
+  .top { display: flex; align-items: center; justify-content: space-between; }
+  .top .qbadge { font-size: 2.6vh; padding: 1.1vh 2.4vw; }
+  .top .qbadge b { font-size: 3.4vh; }
+
+  .body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 2.4vh; min-height: 0; }
+
+  .big-q {
+    text-align: center;
+    font-size: 4.6vh; font-weight: 900; line-height: 1.35;
+    color: #08205c;
+    background: linear-gradient(180deg, #fff, #e6efff);
+    border: .5vh solid var(--cyan);
+    box-shadow: 0 0 4vh rgba(53,168,255,.7);
+    padding: 3.4vh 4vw;
+    clip-path: polygon(3vh 0, 100% 0, 100% calc(100% - 3vh), calc(100% - 3vh) 100%, 0 100%, 0 3vh);
+  }
+
+  .screen-bars { display: grid; gap: 1.6vh; }
+  .screen-bars .bar-key   { width: 6vh; height: 6.6vh; font-size: 3.4vh; }
+  .screen-bars .bar-track { height: 5.6vh; border-radius: 1vh; }
+  .screen-bars .bar-num   { min-width: 16vw; font-size: 2.6vh; }
+  .screen-bars .bar-opt   { flex: 0 0 26vw; font-size: 2.2vh; font-weight: 700; color: #d8e6ff;
+                            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .huge-letter { font-size: 32vh; }
+
+  .counter { text-align: center; }
+  .counter .n { font-size: 16vh; line-height: 1; font-weight: 900; }
+  .counter .cap { font-size: 3vh; color: var(--txt-dim); letter-spacing: .2em; }
+
+  /* 組別多的時候由 screen.js 調小 --rfs，避免排行榜被切掉。
+     選擇器要用 table.rank-screen 才蓋得過 style.css 的 table.rank */
+  table.rank-screen { width: 100%; --rfs: 2.8vh; font-size: var(--rfs); }
+  table.rank-screen th { font-size: calc(var(--rfs) * .72); padding: calc(var(--rfs) * .3) .8vw; }
+  table.rank-screen td { padding: calc(var(--rfs) * .4) .8vw; line-height: 1.25; }
+  table.rank-screen tr.top1 td { font-size: calc(var(--rfs) * 1.28); }
+
+  .foot { display: flex; align-items: center; justify-content: space-between; color: var(--txt-dim); font-size: 1.9vh; }
+  .foot b { color: var(--gold); }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div class="top">
+    <img class="logo" src="assets/img/logo.png" alt="大學星攻略">
+    <span class="qbadge" id="s-badge">第 <b>–</b> 題</span>
+  </div>
+
+  <div class="body" id="s-body">
+    <div class="center"><div class="spin"></div><p class="hint" style="font-size:2.4vh; margin-top:2vh;">連線中…</p></div>
+  </div>
+
+  <div class="foot">
+    <span id="s-phase">待機中</span>
+    <span>崇德志工社　<b>大學星攻略</b></span>
+  </div>
+
+</div>
+
+<script type="module" src="assets/js/screen.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#00043f">
+<meta name="robots" content="noindex">
+<title>題目後台｜大學星攻略</title>
+<link rel="icon" href="assets/img/logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .qitem { border:2px solid rgba(53,168,255,.35); border-radius:12px; padding:14px; background:rgba(4,12,64,.6); }
+  .qitem.editing { border-color: var(--gold); }
+  .qitem .head { display:flex; gap:10px; align-items:center; justify-content:space-between; }
+  .qitem .no { flex:0 0 auto; font-weight:900; color:var(--gold); font-size:15px; }
+  .qitem .txt { flex:1 1 auto; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .qitem .ans { flex:0 0 auto; font-weight:900; color:#7bffab; }
+  .mini { padding:8px 12px; font-size:14px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width:520px){ .grid2 { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap wide">
+
+  <img class="logo" src="assets/img/logo.png" alt="大學星攻略">
+  <p class="hint" style="margin:0 0 14px;">題目 ／ 組別 後台</p>
+
+  <!-- 登入 -->
+  <section id="scr-login" class="stack hidden">
+    <div class="card stack">
+      <div class="field"><label for="in-email">主持人帳號（Email）</label>
+        <input id="in-email" type="email" autocomplete="username"></div>
+      <div class="field"><label for="in-pass">密碼</label>
+        <input id="in-pass" type="password" autocomplete="current-password"></div>
+      <button id="btn-login" class="btn wide">登入</button>
+      <p class="hint" id="login-msg"></p>
+    </div>
+  </section>
+
+  <section id="scr-main" class="stack hidden">
+
+    <!-- 組別 -->
+    <div class="card stack">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <strong class="title-gold" style="font-size:20px;">組別</strong>
+        <span class="hint" id="g-count"></span>
+      </div>
+      <div id="g-list" class="stack"></div>
+      <div class="row">
+        <input id="g-new" placeholder="新增組別名稱，例如：第 1 組" style="flex:1 1 200px;">
+        <button id="g-add" class="btn mini">新增</button>
+        <button id="g-bulk" class="btn ghost mini">快速建立 1～N 組</button>
+      </div>
+    </div>
+
+    <!-- 題目 -->
+    <div class="card stack">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <strong class="title-gold" style="font-size:20px;">題目</strong>
+        <span class="hint" id="q-count"></span>
+      </div>
+      <div id="q-list" class="stack"></div>
+      <button id="q-add" class="btn">＋ 新增一題</button>
+    </div>
+
+    <!-- 編輯器 -->
+    <div id="editor" class="card stack hidden">
+      <strong class="title-gold" style="font-size:20px;" id="ed-title">編輯題目</strong>
+      <div class="field"><label for="ed-text">題幹</label><textarea id="ed-text" placeholder="請輸入題目內容"></textarea></div>
+      <div class="grid2">
+        <div class="field"><label for="ed-a">選項 A</label><input id="ed-a"></div>
+        <div class="field"><label for="ed-b">選項 B</label><input id="ed-b"></div>
+        <div class="field"><label for="ed-c">選項 C</label><input id="ed-c"></div>
+        <div class="field"><label for="ed-d">選項 D</label><input id="ed-d"></div>
+      </div>
+      <div class="field"><label for="ed-key">正確答案</label>
+        <select id="ed-key"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
+      </div>
+      <div class="row">
+        <button id="ed-save"   class="btn" style="flex:1 1 140px;">儲存</button>
+        <button id="ed-cancel" class="btn ghost" style="flex:1 1 100px;">取消</button>
+        <button id="ed-del"    class="btn danger" style="flex:1 1 100px;">刪除此題</button>
+      </div>
+    </div>
+
+    <!-- 批次匯入 -->
+    <div class="card stack">
+      <strong class="title-gold" style="font-size:20px;">批次貼上題目</strong>
+      <p class="hint" style="text-align:left; margin:0;">
+        一題一行，用直線 <code>|</code> 分隔：<br>
+        <code>題幹 | A選項 | B選項 | C選項 | D選項 | 正解字母</code><br>
+        例如：<code>大學必修學分不足會怎樣？|延畢|自動補修|不影響|退選 | A</code>
+      </p>
+      <textarea id="bulk-in" style="min-height:130px;" placeholder="每行一題…"></textarea>
+      <div class="row">
+        <button id="bulk-append"  class="btn ghost">附加到現有題目</button>
+        <button id="bulk-replace" class="btn danger">清空並取代全部題目</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <a class="btn ghost" href="host.html">← 回主持人控制台</a>
+      <button id="btn-logout" class="btn ghost">登出</button>
+    </div>
+
+  </section>
+</div>
+
+<script type="module" src="assets/js/admin.js"></script>
+</body>
+</html>

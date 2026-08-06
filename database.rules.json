@@ -1,0 +1,55 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "config": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    "questions": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    "answerKey": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$qid": {
+        ".read": "root.child('state/revealed').child($qid).val() === true",
+        ".validate": "newData.isString() && newData.val().matches(/^[ABCD]$/)"
+      }
+    },
+
+    "state": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    "stats": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    "leaderboard": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    "responses": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$qid": {
+        "$cid": {
+          ".write": "auth != null || (root.child('state/phase').val() === 'open' && root.child('state/qid').val() === $qid)",
+          ".validate": "newData.hasChildren(['g','c']) && newData.child('c').isString() && newData.child('c').val().matches(/^[ABCD]$/) && root.child('config/groups').child(newData.child('g').val()).exists()",
+          "g": { ".validate": "newData.isString()" },
+          "c": { ".validate": "newData.isString() && newData.val().matches(/^[ABCD]$/)" },
+          "t": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        }
+      }
+    }
+  }
+}
