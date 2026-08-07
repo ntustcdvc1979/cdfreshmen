@@ -46,6 +46,7 @@
   <!-- ===== 3. 作答 ===== -->
   <section id="scr-question" class="stack hidden">
     <div class="center"><span class="qbadge">第 <b id="q-no">1</b> 題</span></div>
+    <div class="center" style="margin-top:10px;"><span class="cat-pill" id="q-cat">—</span></div>
 
     <div class="qpanel"><p id="q-text">…</p></div>
 
@@ -61,6 +62,7 @@
   <!-- ===== 4. 公布答案 ===== -->
   <section id="scr-reveal" class="stack hidden">
     <div class="center"><span class="qbadge">第 <b id="r-no">1</b> 題</span></div>
+    <div class="center" style="margin-top:10px;"><span class="cat-pill" id="r-cat">—</span></div>
     <h2 class="title-gold center" style="font-size:26px; margin:14px 0 0;">🎉 正確答案 🎉</h2>
     <div class="reveal-letter" id="r-letter">A</div>
     <div class="center"><span class="verdict" id="r-verdict">—</span></div>
@@ -80,6 +82,11 @@
         <thead><tr><th style="width:44px;">#</th><th>組別</th><th class="n">答對率</th><th class="n">答對</th></tr></thead>
         <tbody id="final-rows"></tbody>
       </table>
+    </div>
+    <div class="card stack center" id="final-mine" style="margin-top:14px;">
+      <p class="hint" style="margin:0;">你們這組最強的項目</p>
+      <div><span class="cat-pill" id="final-cat">—</span></div>
+      <p class="hint" id="final-cat-note" style="margin:0;"></p>
     </div>
     <p class="hint" style="margin-top:18px;">感謝參與 —— 崇德志工社</p>
   </section>

@@ -294,12 +294,14 @@ textarea { resize: vertical; min-height: 76px; }
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
 }
 .bar-track {
+  display: block;
   flex: 1 1 auto; height: 30px; border-radius: 6px;
   background: rgba(0,10,60,.7);
   border: 1.5px solid rgba(53,168,255,.35);
   overflow: hidden;
 }
 .bar-fill {
+  display: block;   /* span 預設是 inline，不加這行 width / height 都不會生效 */
   height: 100%;
   background: linear-gradient(90deg, #1e5cff, var(--cyan));
   transition: width .6s cubic-bezier(.2,.8,.3,1);
@@ -322,6 +324,32 @@ table.rank tr.top1 td { color: var(--gold); font-size: 18px; }
   background: rgba(53,168,255,.18); border: 1px solid rgba(53,168,255,.5); color: var(--cyan-lt);
 }
 .pill.live { background: rgba(47,217,107,.15); border-color: var(--ok); color: #7bffab; }
+
+/* 題目類別標籤，顏色由 --cat 決定 */
+.cat-pill {
+  display: inline-block;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  color: #fff;
+  background: var(--cat, #7b8bb5);
+  border: 1.5px solid rgba(255,255,255,.38);
+  text-shadow: 0 1px 2px rgba(0,0,0,.45);
+}
+
+/* 組別 × 類別 矩陣 */
+table.matrix { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+table.matrix th, table.matrix td { padding: 8px 6px; text-align: center; border-bottom: 1px solid rgba(53,168,255,.22); }
+table.matrix th.g, table.matrix td.g { text-align: left; white-space: nowrap; }
+table.matrix thead th { font-size: 12px; font-weight: 800; line-height: 1.25; color: #fff; }
+table.matrix thead th span { display: inline-block; padding: 3px 8px; border-radius: 6px; background: var(--cat); }
+table.matrix td { font-weight: 700; font-size: 14px; color: #cfe0ff; }
+table.matrix td.none { color: #5f6f9c; }
+table.matrix td.colwin { color: var(--gold); font-weight: 900; background: rgba(255,200,31,.12); }
+table.matrix td.rowbest { box-shadow: inset 0 0 0 2px rgba(53,168,255,.65); border-radius: 6px; }
+table.matrix td small { display: block; font-size: 11px; font-weight: 600; opacity: .65; }
 .pill.lock { background: rgba(255,84,112,.15); border-color: var(--bad); color: #ffa5b4; }
 
 .spacer { flex: 1 1 auto; }

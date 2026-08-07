@@ -5,8 +5,9 @@
 import {
   db, auth, ref, onValue, set, update, remove,
   signInWithGoogle, consumeRedirectResult, authErrorText, signOut, onAuthStateChanged,
-  PATH, PHASE, LETTERS, $, show, toast, toSortedList, escapeHtml,
-  isHost, notHostHtml, tallyQuestion, buildLeaderboard
+  PATH, PHASE, LETTERS, categoryOf, $, show, toast, toSortedList, escapeHtml,
+  isHost, notHostHtml, tallyQuestion, buildLeaderboard,
+  buildCategoryMatrix, categoryChampions, groupBestCategories, columnWinners
 } from "./common.js";
 
 let groups = {}, questions = {}, keys = {}, allResp = {}, state = {};
@@ -141,7 +142,16 @@ async function doReveal() {
 /** 結束：算出排行榜寫進 /leaderboard，學生端就能看到 */
 async function doFinal() {
   if (!confirm("要結束遊戲並公布最終排行榜嗎？")) return;
-  const rows = buildLeaderboard(groups, questions, keys, allResp, state.revealed);
+
+  // 排行榜順便帶上每組最強的類別，學生手機才看得到（/responses 他們讀不到）
+  const mx    = buildCategoryMatrix(groups, questions, keys, allResp, state.revealed);
+  const best  = new Map(groupBestCategories(mx).map(b => [b.gid, b]));
+  const rows  = buildLeaderboard(groups, questions, keys, allResp, state.revealed)
+    .map(r => {
+      const b = best.get(r.gid);
+      return b?.cat ? { ...r, bestCat: b.cat.id, bestCatRate: b.cell.rate } : r;
+    });
+
   await set(ref(db, PATH.leaderboard), { updatedAt: Date.now(), rows });
   await update(ref(db, PATH.state), { phase: PHASE.FINAL });
   toast("排行榜已公布");
@@ -174,6 +184,10 @@ function paint() {
   const resp = qid ? (allResp[qid] || {}) : {};
   const tally = tallyQuestion(resp, key);
 
+  const cat = categoryOf(q?.cat);
+  $("#live-cat").textContent = q ? cat.name : "—";
+  $("#live-cat").style.setProperty("--cat", cat.color);
+
   $("#live-q").textContent   = q ? `第 ${qIndex(qid) + 1} 題　${q.text || ""}` : "尚未選擇題目";
   $("#live-key").textContent = key || "（未設定）";
   $("#live-count").textContent = tally.total + " 人已作答";
@@ -203,6 +217,63 @@ function paint() {
         <td class="n">${perGroupNow[r.gid] || 0}</td>
       </tr>`).join("")
     : `<tr><td colspan="5" style="color:#a9bce8;">後台尚未建立組別</td></tr>`;
+
+  paintMatrix();
+}
+
+// ------------------------------------------------------------
+//  類別分析
+// ------------------------------------------------------------
+function paintMatrix() {
+  const mx = buildCategoryMatrix(groups, questions, keys, allResp, state.revealed);
+
+  if (!mx.cats.length || !mx.rows.length) {
+    $("#mx-table").innerHTML = `<tbody><tr><td class="hint" style="text-align:left;">還沒有已公布的題目，公布第一題之後就會出現。</td></tr></tbody>`;
+    $("#mx-champs").innerHTML = "";
+    $("#mx-best").innerHTML   = "";
+    return;
+  }
+
+  const wins = columnWinners(mx);
+  const bestOf = groupBestCategories(mx);
+  const bestIdx = new Map(bestOf.map(b => [b.gid, b.cat ? mx.cats.findIndex(c => c.id === b.cat.id) : -1]));
+
+  $("#mx-table").innerHTML = `
+    <thead><tr>
+      <th class="g">組別</th>
+      ${mx.cats.map(c => `<th><span style="--cat:${c.color}">${escapeHtml(c.name)}</span></th>`).join("")}
+    </tr></thead>
+    <tbody>
+      ${mx.rows.map((row, ri) => `<tr>
+        <td class="g">${escapeHtml(row.name)}</td>
+        ${row.cells.map((cell, ci) => {
+          const cls = [
+            cell.rate === null ? "none" : "",
+            wins[ci] === ri ? "colwin" : "",
+            bestIdx.get(row.gid) === ci ? "rowbest" : ""
+          ].filter(Boolean).join(" ");
+          return `<td class="${cls}">${
+            cell.rate === null ? "–" : `${cell.rate}%<small>${cell.correct}/${cell.answered}</small>`
+          }</td>`;
+        }).join("")}
+      </tr>`).join("")}
+    </tbody>`;
+
+  $("#mx-champs").innerHTML = categoryChampions(mx).map(({ cat, best }) => `
+    <div class="row" style="align-items:center; gap:8px;">
+      <span class="cat-pill" style="--cat:${cat.color}">${escapeHtml(cat.name)}</span>
+      <span style="font-weight:800;">${best ? escapeHtml(best.name) : "—"}</span>
+      <span style="color:var(--gold-lt); font-weight:800;">${best ? best.rate + "%" : ""}</span>
+    </div>`).join("");
+
+  $("#mx-best").innerHTML = bestOf.map(b => `
+    <div class="row" style="align-items:center; gap:8px;">
+      <span style="font-weight:800; min-width:72px;">${escapeHtml(b.name)}</span>
+      ${b.cat
+        ? `<span class="cat-pill" style="--cat:${b.cat.color}">${escapeHtml(b.cat.name)}</span>
+           <span style="color:var(--gold-lt); font-weight:800;">${b.cell.rate}%</span>`
+        : `<span class="hint">尚未作答</span>`}
+    </div>`).join("");
 }
 
 // ------------------------------------------------------------

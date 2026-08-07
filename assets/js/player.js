@@ -4,7 +4,7 @@
 
 import {
   db, ref, onValue, get, set, serverTimestamp,
-  PATH, PHASE, LETTERS, clientId, $, show, toast, toSortedList, escapeHtml
+  PATH, PHASE, LETTERS, categoryOf, clientId, $, show, toast, toSortedList, escapeHtml
 } from "./common.js";
 
 const me = clientId();
@@ -91,6 +91,14 @@ function fail(err) {
   goto("error");
 }
 
+/** 把類別標籤塗上該類別的顏色；沒設定類別的題目就整個藏起來 */
+function paintCatPill(el, q) {
+  const cat = categoryOf(q?.cat);
+  el.textContent = cat.name;
+  el.style.setProperty("--cat", cat.color);
+  el.parentElement.style.display = q?.cat ? "" : "none";
+}
+
 /** 題目在整份題庫中的序號（第幾題） */
 function questionNo(qid) {
   const list = toSortedList(questions);
@@ -130,6 +138,7 @@ function renderQuestion(qid, q, phase) {
     renderedQid = qid;
     $("#q-no").textContent   = questionNo(qid);
     $("#q-text").textContent = q.text || "";
+    paintCatPill($("#q-cat"), q);
 
     const box = $("#opts");
     box.innerHTML = "";
@@ -193,6 +202,7 @@ function renderReveal(qid, q) {
   if (revealedQid === qid) return;   // 已經在公布這一題，不要重跑動畫
   revealedQid = qid;
   $("#r-no").textContent = questionNo(qid);
+  paintCatPill($("#r-cat"), q);
 
   // 正解：資料庫規則規定「已公布」才讀得到，所以現在才掛監聽
   keyUnsub = onValue(ref(db, `${PATH.answerKey}/${qid}`), snap => {
@@ -243,13 +253,26 @@ async function renderFinal() {
     $("#final-rows").innerHTML = rows.length
       ? rows.map((r, i) => `<tr class="${i === 0 ? "top1" : ""}">
           <td>${i === 0 ? "🏆" : i + 1}</td>
-          <td>${escapeHtml(r.name)}</td>
+          <td>${escapeHtml(r.name)}${r.gid === myGroup ? " ←" : ""}</td>
           <td class="n">${r.rate}%</td>
           <td class="n">${r.correct}/${r.answered}</td>
         </tr>`).join("")
       : `<tr><td colspan="4" style="color:#a9bce8;">主持人尚未產生排行榜</td></tr>`;
+
+    // 自己這一組最強的類別
+    const mine = rows.find(r => r.gid === myGroup);
+    if (mine?.bestCat) {
+      const cat = categoryOf(mine.bestCat);
+      $("#final-cat").textContent = cat.name;
+      $("#final-cat").style.setProperty("--cat", cat.color);
+      $("#final-cat-note").textContent = `這個項目答對率 ${mine.bestCatRate}%`;
+      show($("#final-mine"), true);
+    } else {
+      show($("#final-mine"), false);
+    }
   } catch {
     $("#final-rows").innerHTML = `<tr><td colspan="4" style="color:#a9bce8;">讀取排行榜失敗</td></tr>`;
+    show($("#final-mine"), false);
   }
 }
 

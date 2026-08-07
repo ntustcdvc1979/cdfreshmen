@@ -5,8 +5,16 @@
 import {
   db, auth, ref, onValue, set, update, remove,
   signInWithGoogle, consumeRedirectResult, authErrorText, signOut, onAuthStateChanged,
-  PATH, LETTERS, $, show, toast, toSortedList, escapeHtml, isHost, notHostHtml
+  PATH, LETTERS, CATEGORIES, UNCATEGORIZED, categoryOf, parseBulkQuestions,
+  $, show, toast, toSortedList, escapeHtml, isHost, notHostHtml
 } from "./common.js";
+
+// 類別下拉選單與批次匯入的說明文字
+$("#ed-cat").innerHTML =
+  `<option value="">${UNCATEGORIZED.name}</option>` +
+  CATEGORIES.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+$("#bulk-cats").innerHTML =
+  CATEGORIES.map(c => `<code style="color:${c.color}">${escapeHtml(c.name)}</code>`).join(" ");
 
 let groups = {}, questions = {}, keys = {};
 let editing = null;            // 正在編輯的題目 id；"new" 代表新增
@@ -118,19 +126,23 @@ async function swapOrder(path, a, b) {
 function paintQuestions() {
   const list = toSortedList(questions);
   $("#q-count").textContent = list.length + " 題";
-  $("#q-list").innerHTML = list.map((q, i) => `
+  $("#q-list").innerHTML = list.map((q, i) => {
+    const cat = categoryOf(q.cat);
+    return `
     <div class="qitem ${editing === q.id ? "editing" : ""}" data-qid="${escapeHtml(q.id)}">
       <div class="head">
         <span class="no">第 ${i + 1} 題</span>
         <span class="txt">${escapeHtml(q.text || "（無題幹）")}</span>
         <span class="ans">${keys[q.id] ? "正解 " + keys[q.id] : "⚠ 無正解"}</span>
       </div>
+      <div style="margin-top:8px;"><span class="cat-pill" style="--cat:${cat.color}">${escapeHtml(cat.name)}</span></div>
       <div class="row" style="margin-top:10px;">
         <button class="btn ghost mini q-edit">編輯</button>
         <button class="btn ghost mini q-up">↑</button>
         <button class="btn ghost mini q-down">↓</button>
       </div>
-    </div>`).join("") || `<p class="hint" style="text-align:left;">尚未建立任何題目。</p>`;
+    </div>`;
+  }).join("") || `<p class="hint" style="text-align:left;">尚未建立任何題目。</p>`;
 }
 
 $("#q-list").addEventListener("click", async e => {
@@ -151,6 +163,7 @@ function openEditor(qid) {
   editing = qid;
   const q = qid === "new" ? {} : (questions[qid] || {});
   $("#ed-title").textContent = qid === "new" ? "新增題目" : "編輯第 " + (toSortedList(questions).findIndex(x => x.id === qid) + 1) + " 題";
+  $("#ed-cat").value  = q.cat || "";
   $("#ed-text").value = q.text || "";
   for (const L of LETTERS) $("#ed-" + L.toLowerCase()).value = q[L.toLowerCase()] || "";
   $("#ed-key").value = (qid === "new" ? "A" : keys[qid]) || "A";
@@ -173,6 +186,7 @@ $("#ed-save").addEventListener("click", async () => {
   if (!text) { toast("請輸入題幹"); return; }
 
   const data = { text };
+  if ($("#ed-cat").value) data.cat = $("#ed-cat").value;
   for (const L of LETTERS) {
     const v = $("#ed-" + L.toLowerCase()).value.trim();
     if (v) data[L.toLowerCase()] = v;
@@ -209,26 +223,6 @@ $("#ed-del").addEventListener("click", async () => {
 // ============================================================
 //  批次貼上
 // ============================================================
-function parseBulk(raw) {
-  const out = [];
-  for (const line of raw.split(/\r?\n/)) {
-    const t = line.trim();
-    if (!t) continue;
-    const parts = t.split("|").map(s => s.trim());
-    if (parts.length < 4) throw new Error(`這行欄位不夠：${t.slice(0, 30)}…`);
-    const key = (parts[parts.length - 1] || "").toUpperCase();
-    if (!LETTERS.includes(key)) throw new Error(`最後一欄要是 A/B/C/D：${t.slice(0, 30)}…`);
-    const [text, a, b, c, d] = parts;
-    const q = { text, a, b };
-    if (c) q.c = c;
-    if (d) q.d = d;
-    if (!q[key.toLowerCase()]) throw new Error(`正解 ${key} 對應的選項是空的：${t.slice(0, 30)}…`);
-    out.push({ q, key });
-  }
-  if (!out.length) throw new Error("沒有讀到任何題目");
-  return out;
-}
-
 async function writeBulk(items, replace) {
   if (replace) {
     await Promise.all([
@@ -258,7 +252,7 @@ $("#bulk-replace").addEventListener("click", () => {
 
 async function runBulk(replace) {
   try {
-    const items = parseBulk($("#bulk-in").value);
+    const items = parseBulkQuestions($("#bulk-in").value);
     await writeBulk(items, replace);
     $("#bulk-in").value = "";
     toast(`已匯入 ${items.length} 題`);

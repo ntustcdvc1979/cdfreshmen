@@ -56,8 +56,18 @@
   table.rank-screen td { padding: calc(var(--rfs) * .4) .8vw; line-height: 1.25; }
   table.rank-screen tr.top1 td { font-size: calc(var(--rfs) * 1.28); }
 
-  .foot { display: flex; align-items: center; justify-content: space-between; color: var(--txt-dim); font-size: 1.9vh; }
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 2vw; color: var(--txt-dim); font-size: 1.9vh; }
   .foot b { color: var(--gold); }
+  #s-tip { flex: 1 1 auto; text-align: center; color: var(--gold-lt); }
+
+  /* 類別矩陣，字級由 screen.js 依組別數量調整。
+     td 的 font-size 一定要在這裡重寫 —— style.css 的 table.matrix td 是固定 px，
+     只設在 table 上的話會被子層蓋掉，字就縮不下去。 */
+  table.matrix.matrix-screen { --mfs: 2.2vh; }
+  table.matrix.matrix-screen th,
+  table.matrix.matrix-screen td { padding: calc(var(--mfs) * .32) .5vw; font-size: var(--mfs); line-height: 1.18; }
+  table.matrix.matrix-screen thead th { font-size: calc(var(--mfs) * .8); }
+  table.matrix.matrix-screen td small { font-size: calc(var(--mfs) * .56); }
 </style>
 </head>
 <body>
@@ -65,6 +75,7 @@
 
   <div class="top">
     <img class="logo" src="assets/img/logo.png" alt="大學星攻略">
+    <span class="cat-pill" id="s-cat" style="font-size:2.2vh; padding:.8vh 1.6vw;">—</span>
     <span class="qbadge" id="s-badge">第 <b>–</b> 題</span>
   </div>
 
@@ -74,6 +85,7 @@
 
   <div class="foot">
     <span id="s-phase">待機中</span>
+    <span id="s-tip"></span>
     <span>崇德志工社　<b>大學星攻略</b></span>
   </div>
 

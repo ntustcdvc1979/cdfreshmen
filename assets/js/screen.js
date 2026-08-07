@@ -6,7 +6,8 @@
 
 import {
   db, auth, ref, onValue, onAuthStateChanged,
-  PATH, PHASE, LETTERS, $, escapeHtml, toSortedList, isHost, tallyQuestion, buildLeaderboard
+  PATH, PHASE, LETTERS, categoryOf, $, escapeHtml, toSortedList, isHost,
+  tallyQuestion, buildLeaderboard, buildCategoryMatrix, groupBestCategories, columnWinners
 } from "./common.js";
 
 let groups = {}, questions = {}, keys = {}, allResp = {}, state = {}, board = null;
@@ -15,6 +16,19 @@ let ready = false;
 const body  = $("#s-body");
 const badge = $("#s-badge");
 const foot  = $("#s-phase");
+const tip   = $("#s-tip");
+
+// 結束畫面在「排行榜」與「類別分析」之間切換（按空白鍵、方向鍵或點畫面）
+let finalView = "rank";
+function toggleFinalView() {
+  if ((state.phase || "") !== PHASE.FINAL) return;
+  finalView = finalView === "rank" ? "matrix" : "rank";
+  paint();
+}
+addEventListener("keydown", e => {
+  if ([" ", "ArrowRight", "ArrowLeft", "Enter"].includes(e.key)) { e.preventDefault(); toggleFinalView(); }
+});
+addEventListener("click", toggleFinalView);
 
 onAuthStateChanged(auth, async user => {
   if (!await isHost(user)) {
@@ -35,6 +49,20 @@ onAuthStateChanged(auth, async user => {
   onValue(ref(db, PATH.state),       s => { state     = s.val() || {}; paint(); });
 });
 
+/**
+ * 把表格字級縮到剛好塞得下容器。
+ * 組別數、類別數、投影機比例都會變，用算的猜不準，直接量。
+ */
+function fitToBox(table, box, prop, startVh, minVh = 0.8) {
+  let vh = startVh;
+  table.style.setProperty(prop, vh.toFixed(2) + "vh");
+  for (let i = 0; i < 40 && vh > minVh; i++) {
+    if (box.scrollHeight <= box.clientHeight + 1) break;
+    vh = Math.max(minVh, vh - 0.08);
+    table.style.setProperty(prop, vh.toFixed(2) + "vh");
+  }
+}
+
 const qList  = () => toSortedList(questions);
 const qIndex = qid => qList().findIndex(q => q.id === qid);
 
@@ -47,6 +75,13 @@ function paint() {
   const tally = tallyQuestion(qid ? allResp[qid] : null, key);
 
   badge.innerHTML = q ? `第 <b>${qIndex(qid) + 1}</b> 題` : `第 <b>–</b> 題`;
+
+  const cat = categoryOf(q?.cat);
+  $("#s-cat").textContent = q ? cat.name : "—";
+  $("#s-cat").style.setProperty("--cat", cat.color);
+  $("#s-cat").style.visibility = q ? "visible" : "hidden";
+
+  tip.textContent = "";
 
   if (phase === PHASE.FINAL)                       return paintFinal();
   if (phase === PHASE.REVEAL && q)                 return paintReveal(q, key, tally);
@@ -98,14 +133,15 @@ function paintReveal(q, key, tally) {
 }
 
 function paintFinal() {
+  if (finalView === "matrix") return paintMatrixScreen();
+
   foot.textContent = "最終排行榜";
+  tip.textContent  = "按空白鍵切換到類別分析 →";
   const rows = board?.rows || buildLeaderboard(groups, questions, keys, allResp, state.revealed);
-  // 組別越多字越小，讓整張榜一次塞進投影畫面，不用捲動
-  const rfs = Math.min(2.8, 28 / Math.max(rows.length, 1)).toFixed(2) + "vh";
   body.innerHTML = `
     <h2 class="title-gold center" style="font-size:5.4vh; margin:0 0 2vh;">★ 最終排行榜 ★</h2>
-    <div class="card" style="overflow:auto;">
-      <table class="rank rank-screen" style="--rfs:${rfs}">
+    <div class="card" style="overflow:hidden;">
+      <table class="rank rank-screen">
         <thead><tr><th style="width:8vh;">#</th><th>組別</th><th class="n">答對率</th><th class="n">答對／作答</th></tr></thead>
         <tbody>${
           rows.length
@@ -119,4 +155,52 @@ function paintFinal() {
         }</tbody>
       </table>
     </div>`;
+  fitToBox($(".rank-screen"), $(".rank-screen").parentElement, "--rfs", 2.8);
+}
+
+/** 組別 × 類別 矩陣：一張表同時回答「哪組擅長這個類別」和「這組擅長哪個類別」 */
+function paintMatrixScreen() {
+  foot.textContent = "類別分析";
+  tip.textContent  = "← 按空白鍵切回排行榜";
+
+  const mx = buildCategoryMatrix(groups, questions, keys, allResp, state.revealed);
+  if (!mx.cats.length || !mx.rows.length) {
+    body.innerHTML = `<p class="hint center" style="font-size:2.6vh;">還沒有已公布的題目</p>`;
+    return;
+  }
+
+  const wins    = columnWinners(mx);
+  const bestOf  = groupBestCategories(mx);
+  const bestIdx = new Map(bestOf.map(b => [b.gid, b.cat ? mx.cats.findIndex(c => c.id === b.cat.id) : -1]));
+
+  body.innerHTML = `
+    <h2 class="title-gold center" style="font-size:4.4vh; margin:0 0 1.4vh;">各組強項分析</h2>
+    <p class="hint center" style="font-size:1.9vh; margin:0 0 1.6vh;">
+      數字為答對率　<b style="color:var(--gold)">金色</b>＝該類別最強的組
+      <b style="color:var(--cyan-lt)">藍框</b>＝該組最強的類別
+    </p>
+    <div class="card" style="overflow:hidden;">
+      <table class="matrix matrix-screen">
+        <thead><tr>
+          <th class="g">組別</th>
+          ${mx.cats.map(c => `<th><span style="--cat:${c.color}">${escapeHtml(c.name)}</span></th>`).join("")}
+        </tr></thead>
+        <tbody>
+          ${mx.rows.map((row, ri) => `<tr>
+            <td class="g">${escapeHtml(row.name)}</td>
+            ${row.cells.map((cell, ci) => {
+              const cls = [
+                cell.rate === null ? "none" : "",
+                wins[ci] === ri ? "colwin" : "",
+                bestIdx.get(row.gid) === ci ? "rowbest" : ""
+              ].filter(Boolean).join(" ");
+              return `<td class="${cls}">${
+                cell.rate === null ? "–" : `${cell.rate}%<small>${cell.correct}/${cell.answered}</small>`
+              }</td>`;
+            }).join("")}
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+  fitToBox($(".matrix-screen"), $(".matrix-screen").parentElement, "--mfs", 2.2);
 }

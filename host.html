@@ -9,6 +9,9 @@
 <link rel="icon" href="assets/img/logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
+<style>
+  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr !important; } }
+</style>
 </head>
 <body>
 <div class="wrap wide">
@@ -66,6 +69,7 @@
         <strong class="title-gold" style="font-size:19px;">即時作答狀況</strong>
         <span class="hint" id="live-count">0 人已作答</span>
       </div>
+      <p style="margin:0;"><span class="cat-pill" id="live-cat">—</span></p>
       <p id="live-q" class="hint" style="text-align:left; margin:0;">—</p>
       <div class="bars" id="live-bars"></div>
       <p class="hint" style="text-align:left; margin:6px 0 0;">正解：<b id="live-key" style="color:var(--gold)">—</b>（只有你看得到，學生端要按「公布答案」才讀得到）</p>
@@ -78,6 +82,30 @@
         <thead><tr><th style="width:44px;">#</th><th>組別</th><th class="n">答對率</th><th class="n">答對</th><th class="n">本題已答</th></tr></thead>
         <tbody id="rank-rows"></tbody>
       </table>
+    </div>
+
+    <!-- 類別分析 -->
+    <div class="card stack">
+      <strong class="title-gold" style="font-size:19px;">類別分析</strong>
+      <p class="hint" style="text-align:left; margin:0;">
+        只計算已公布的題目。<b style="color:var(--gold)">金色</b> = 該類別最強的組，
+        <b style="color:var(--cyan-lt)">藍框</b> = 該組最強的類別。
+      </p>
+
+      <div style="overflow-x:auto;">
+        <table class="matrix" id="mx-table"></table>
+      </div>
+
+      <div class="grid2" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+        <div>
+          <p class="hint" style="text-align:left; margin:0 0 6px;"><b>各類別最強的組</b></p>
+          <div class="stack" id="mx-champs" style="gap:6px;"></div>
+        </div>
+        <div>
+          <p class="hint" style="text-align:left; margin:0 0 6px;"><b>各組最強的類別</b></p>
+          <div class="stack" id="mx-best" style="gap:6px;"></div>
+        </div>
+      </div>
     </div>
 
     <div class="card stack">

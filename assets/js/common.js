@@ -102,6 +102,26 @@ export const PHASE = {
 
 export const LETTERS = ["A", "B", "C", "D"];
 
+/**
+ * 題目類別。順序與顏色對應活動主視覺上那六張卡片。
+ * 要增減或改名直接改這裡；已存在的題目是用 id 存的，改 name 不會影響舊資料。
+ */
+export const CATEGORIES = [
+  { id: "social",   name: "人際網絡高手", color: "#e6266f" },
+  { id: "goodwill", name: "親善大使",     color: "#f0ad00" },
+  { id: "food",     name: "美食小當家",   color: "#14a05a" },
+  { id: "time",     name: "時間管理大師", color: "#dd7b0e" },
+  { id: "emotion",  name: "情緒管理大師", color: "#8b5cf6" },
+  { id: "team",     name: "團隊領航員",   color: "#2f7bf6" }
+];
+
+export const UNCATEGORIZED = { id: "uncat", name: "未分類", color: "#7b8bb5" };
+
+/** 由 id 取回類別（找不到就回傳「未分類」） */
+export function categoryOf(id) {
+  return CATEGORIES.find(c => c.id === id) || UNCATEGORIZED;
+}
+
 // ---------- 小工具 ----------
 
 /** 這台裝置的固定識別碼（同一組多人 → 每支手機一筆答案） */
@@ -149,6 +169,49 @@ export function toast(msg, ms = 2200) {
   requestAnimationFrame(() => el.classList.add("show"));
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove("show"), ms);
+}
+
+/**
+ * 解析批次貼上的題目。一行一題，用 | 分隔：
+ *   題幹 | A選項 | B選項 | C選項 | D選項 | 正解字母 | 類別（可省略）
+ * 回傳 [{ q:{text,a,b,c,d,cat}, key:"A" }…]，格式有問題就丟出帶行內容的錯誤。
+ */
+export function parseBulkQuestions(raw) {
+  const out = [];
+  for (const line of String(raw ?? "").split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t) continue;
+    const where = `：${t.slice(0, 30)}…`;
+
+    const parts = t.split("|").map(s => s.trim());
+    if (parts.length < 4) throw new Error(`這行欄位不夠${where}`);
+
+    // 最後一欄可能是正解，也可能是類別（類別在正解後面）
+    let cat = "";
+    if (!LETTERS.includes((parts[parts.length - 1] || "").toUpperCase())) {
+      const named = parts.pop();
+      const found = CATEGORIES.find(c => c.name === named || c.id === named);
+      if (!found) throw new Error(`看不懂最後一欄「${named}」，要嘛是正解 A/B/C/D，要嘛是類別名稱${where}`);
+      cat = found.id;
+      if (!LETTERS.includes((parts[parts.length - 1] || "").toUpperCase())) {
+        throw new Error(`類別前面那一欄要是正解 A/B/C/D${where}`);
+      }
+    }
+
+    const key = parts.pop().toUpperCase();      // 拿掉正解，剩下題幹與選項
+    const [text, a, b, c, d] = parts;
+    if (!text || !a || !b) throw new Error(`題幹與 A、B 選項不能空白${where}`);
+
+    const q = { text, a, b };
+    if (c) q.c = c;
+    if (d) q.d = d;
+    if (cat) q.cat = cat;
+    if (!q[key.toLowerCase()]) throw new Error(`正解是 ${key}，但選項 ${key} 沒有填${where}`);
+
+    out.push({ q, key });
+  }
+  if (!out.length) throw new Error("沒有讀到任何題目");
+  return out;
 }
 
 /** 物件 → 陣列，附上 key，並依 order 排序 */
@@ -208,4 +271,88 @@ export function buildLeaderboard(groups, questions, answerKeys, allResponses, re
   return Object.values(acc)
     .map(r => ({ ...r, rate: r.answered ? Math.round(r.correct / r.answered * 1000) / 10 : 0 }))
     .sort((a, b) => b.rate - a.rate || b.correct - a.correct || a.name.localeCompare(b.name, "zh-Hant"));
+}
+
+/**
+ * 組別 × 類別 的答對率矩陣。
+ * 只計算已公布的題目，rate 為 null 代表該組在那個類別完全沒作答。
+ * 回傳 { cats:[類別…], rows:[{gid,name,cells:[{cat,answered,correct,rate}…]}…] }
+ * cells 的順序與 cats 一一對應。
+ */
+export function buildCategoryMatrix(groups, questions, answerKeys, allResponses, revealed) {
+  const gl = toSortedList(groups);
+  const acc = {};                       // acc[gid][catId] = { answered, correct }
+  const used = new Set();
+  for (const g of gl) acc[g.id] = {};
+
+  for (const q of toSortedList(questions)) {
+    if (!revealed?.[q.id]) continue;
+    const key = answerKeys?.[q.id];
+    if (!key) continue;
+    const cat = categoryOf(q.cat).id;
+    used.add(cat);
+    for (const r of Object.values(allResponses?.[q.id] || {})) {
+      const bucket = acc[r?.g];
+      if (!bucket || !LETTERS.includes(r?.c)) continue;
+      bucket[cat] ??= { answered: 0, correct: 0 };
+      bucket[cat].answered++;
+      if (r.c === key) bucket[cat].correct++;
+    }
+  }
+
+  const cats = CATEGORIES.filter(c => used.has(c.id));
+  if (used.has(UNCATEGORIZED.id)) cats.push(UNCATEGORIZED);
+
+  const rows = gl.map(g => ({
+    gid: g.id,
+    name: g.name,
+    cells: cats.map(c => {
+      const v = acc[g.id][c.id];
+      return {
+        cat: c.id,
+        answered: v?.answered || 0,
+        correct: v?.correct || 0,
+        rate: v?.answered ? Math.round(v.correct / v.answered * 1000) / 10 : null
+      };
+    })
+  }));
+
+  return { cats, rows };
+}
+
+/** 比較兩個格子誰比較強：先比答對率，再比答對人次 */
+function better(a, b) {
+  if (!a || a.rate === null) return false;
+  if (!b || b.rate === null) return true;
+  return a.rate > b.rate || (a.rate === b.rate && a.correct > b.correct);
+}
+
+/** 每個類別的冠軍組別 → [{ cat, best:{gid,name,rate,correct,answered} | null }] */
+export function categoryChampions(matrix) {
+  return matrix.cats.map((cat, i) => {
+    let best = null;
+    for (const row of matrix.rows) {
+      const cell = row.cells[i];
+      if (better(cell, best)) best = { gid: row.gid, name: row.name, ...cell };
+    }
+    return { cat, best };
+  });
+}
+
+/** 每一組最擅長的類別 → [{ gid, name, cat, cell } | cat 為 null 代表沒作答] */
+export function groupBestCategories(matrix) {
+  return matrix.rows.map(row => {
+    let best = null, at = -1;
+    row.cells.forEach((cell, i) => { if (better(cell, best)) { best = cell; at = i; } });
+    return { gid: row.gid, name: row.name, cat: at >= 0 ? matrix.cats[at] : null, cell: best };
+  });
+}
+
+/** 矩陣中每一欄（類別）最強的那一列索引，用來在表格上標記 */
+export function columnWinners(matrix) {
+  return matrix.cats.map((_, i) => {
+    let best = null, at = -1;
+    matrix.rows.forEach((row, r) => { if (better(row.cells[i], best)) { best = row.cells[i]; at = r; } });
+    return at;
+  });
 }
