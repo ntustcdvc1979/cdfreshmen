@@ -10,7 +10,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
 <style>
-  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr !important; } }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+  .repline { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(53,168,255,.18); }
+  .repline .nm { flex:1 1 auto; font-weight:700; }
+  .inline-field { display:flex; align-items:center; gap:8px; }
+  .inline-field label { margin:0; white-space:nowrap; }
+  .inline-field input { width:88px; }
 </style>
 </head>
 <body>
@@ -39,47 +45,101 @@
   <!-- ===== 控制台 ===== -->
   <section id="scr-console" class="stack hidden">
 
+    <!-- 主控 -->
     <div class="card stack">
       <div class="row" style="align-items:center; justify-content:space-between;">
         <span class="pill" id="tag-phase">待機中</span>
+        <span class="timer" id="tag-timer" style="font-size:22px; min-width:52px; padding:2px 10px;">–</span>
         <span class="hint" id="tag-who" style="text-align:right;"></span>
       </div>
 
-      <div class="field">
-        <label for="sel-q">目前題目</label>
-        <select id="sel-q"><option>載入中…</option></select>
+      <div class="grid2">
+        <div class="field">
+          <label for="sel-list">題庫</label>
+          <select id="sel-list">
+            <option value="main">正式題目</option>
+            <option value="demo">DEMO 練習題（不計分）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="sel-q">目前題目</label>
+          <select id="sel-q"><option>載入中…</option></select>
+        </div>
       </div>
 
       <div class="row">
-        <button id="btn-open"   class="btn"        style="flex:1 1 140px;">▶ 出題／開放作答</button>
-        <button id="btn-lock"   class="btn ghost"  style="flex:1 1 140px;">■ 截止作答</button>
-        <button id="btn-reveal" class="btn"        style="flex:1 1 140px;">🎉 公布答案</button>
+        <button id="btn-open"   class="btn"       style="flex:1 1 150px;">▶ 出題／開始倒數</button>
+        <button id="btn-lock"   class="btn ghost" style="flex:1 1 130px;">■ 提前截止</button>
+        <button id="btn-reveal" class="btn"       style="flex:1 1 140px;">🎉 公布答案</button>
       </div>
       <div class="row">
         <button id="btn-prev"  class="btn ghost" style="flex:1 1 110px;">← 上一題</button>
         <button id="btn-next"  class="btn ghost" style="flex:1 1 110px;">下一題 →</button>
-        <button id="btn-idle"  class="btn ghost" style="flex:1 1 110px;">回到待機畫面</button>
-        <button id="btn-final" class="btn"       style="flex:1 1 160px;">🏆 結束並公布排行榜</button>
+        <button id="btn-idle"  class="btn ghost" style="flex:1 1 110px;">回到待機</button>
+        <button id="btn-final" class="btn"       style="flex:1 1 170px;">🏆 結束並公布排行榜</button>
       </div>
+      <p class="hint" style="text-align:left; margin:0;">
+        倒數歸零會自動截止作答（不會自動公布答案）。「下一題」會直接出題並重新開始倒數。
+      </p>
     </div>
 
-    <!-- 即時統計 -->
+    <!-- 投影設定 -->
+    <div class="card stack">
+      <strong class="title-gold" style="font-size:19px;">投影設定</strong>
+      <div class="row" style="align-items:center;">
+        <div class="inline-field">
+          <label for="in-limit">倒數秒數</label>
+          <input id="in-limit" type="number" min="5" max="600" step="5" value="60">
+        </div>
+        <div class="inline-field">
+          <label for="in-cols">格子欄數</label>
+          <input id="in-cols" type="number" min="0" max="12" step="1" value="0">
+        </div>
+        <span class="hint">欄數填 0 = 自動</span>
+      </div>
+      <label class="row" style="align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" id="in-showletters" style="width:auto;">
+        <span>鎖定前就在投影幕顯示各組選的字母</span>
+      </label>
+      <p class="hint" style="text-align:left; margin:0;">
+        取消勾選的話，鎖定前只顯示「已確認 ✓ / 未確認 ···」，公布答案時才翻出字母 ——
+        可以避免後決定的組別看著別組的答案下注。
+      </p>
+    </div>
+
+    <!-- 即時狀況 -->
     <div class="card stack">
       <div class="row" style="justify-content:space-between; align-items:baseline;">
-        <strong class="title-gold" style="font-size:19px;">即時作答狀況</strong>
-        <span class="hint" id="live-count">0 人已作答</span>
+        <strong class="title-gold" style="font-size:19px;">本題即時狀況</strong>
+        <span class="hint" id="live-count">—</span>
       </div>
       <p style="margin:0;"><span class="cat-pill" id="live-cat">—</span></p>
       <p id="live-q" class="hint" style="text-align:left; margin:0;">—</p>
-      <div class="bars" id="live-bars"></div>
-      <p class="hint" style="text-align:left; margin:6px 0 0;">正解：<b id="live-key" style="color:var(--gold)">—</b>（只有你看得到，學生端要按「公布答案」才讀得到）</p>
+
+      <div class="grid2">
+        <div>
+          <p class="hint" style="text-align:left; margin:0 0 6px;"><b>各組代表已確認的答案</b></p>
+          <div class="bars" id="live-repbars"></div>
+        </div>
+        <div>
+          <p class="hint" style="text-align:left; margin:0 0 6px;"><b>台下組員的整場分布</b></p>
+          <div class="bars" id="live-membars"></div>
+        </div>
+      </div>
+      <p class="hint" style="text-align:left; margin:6px 0 0;">
+        正解：<b id="live-key" style="color:var(--gold)">—</b>
+        （只有你看得到，要按「公布答案」學生端才讀得到）
+      </p>
     </div>
 
-    <!-- 各組進度 -->
+    <!-- 排行榜 -->
     <div class="card">
-      <strong class="title-gold" style="font-size:19px;">各組即時排名（依答對率）</strong>
+      <strong class="title-gold" style="font-size:19px;">即時排行榜（只計正式題目）</strong>
       <table class="rank" style="margin-top:10px;">
-        <thead><tr><th style="width:44px;">#</th><th>組別</th><th class="n">答對率</th><th class="n">答對</th><th class="n">本題已答</th></tr></thead>
+        <thead><tr>
+          <th style="width:44px;">#</th><th>組別</th>
+          <th class="n">總分</th><th class="n">代表答對</th><th class="n">組員過半</th><th class="n">本題</th>
+        </tr></thead>
         <tbody id="rank-rows"></tbody>
       </table>
     </div>
@@ -88,15 +148,11 @@
     <div class="card stack">
       <strong class="title-gold" style="font-size:19px;">類別分析</strong>
       <p class="hint" style="text-align:left; margin:0;">
-        只計算已公布的題目。<b style="color:var(--gold)">金色</b> = 該類別最強的組，
-        <b style="color:var(--cyan-lt)">藍框</b> = 該組最強的類別。
+        <b style="color:var(--gold)">金色</b> = 該類別最強的組，
+        <b style="color:var(--cyan-lt)">藍框</b> = 該組最強的類別。數字是得分率。
       </p>
-
-      <div style="overflow-x:auto;">
-        <table class="matrix" id="mx-table"></table>
-      </div>
-
-      <div class="grid2" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+      <div style="overflow-x:auto;"><table class="matrix" id="mx-table"></table></div>
+      <div class="grid2">
         <div>
           <p class="hint" style="text-align:left; margin:0 0 6px;"><b>各類別最強的組</b></p>
           <div class="stack" id="mx-champs" style="gap:6px;"></div>
@@ -108,6 +164,17 @@
       </div>
     </div>
 
+    <!-- 代表名單 -->
+    <div class="card stack">
+      <strong class="title-gold" style="font-size:19px;">各組代表</strong>
+      <p class="hint" style="text-align:left; margin:0;">
+        代表換人、或有人手機壞掉需要重新指定時，按「釋放」把位子空出來，
+        新的人就能在自己手機上選「上台代表」。
+      </p>
+      <div id="rep-list" class="stack" style="gap:0;"></div>
+    </div>
+
+    <!-- 其他 -->
     <div class="card stack">
       <strong class="title-gold" style="font-size:19px;">其他</strong>
       <div class="row">
@@ -116,10 +183,14 @@
         <button id="btn-qr" class="btn ghost">📱 顯示玩家端 QR Code</button>
       </div>
       <div class="row">
-        <button id="btn-reset"  class="btn danger">⟲ 清除所有作答紀錄</button>
-        <button id="btn-logout" class="btn ghost">登出</button>
+        <button id="btn-clear-q"  class="btn ghost">⟲ 清除本題作答</button>
+        <button id="btn-reset"    class="btn danger">⟲ 清除所有作答紀錄</button>
+        <button id="btn-logout"   class="btn ghost">登出</button>
       </div>
-      <p class="hint" style="text-align:left; margin:0;">「清除所有作答紀錄」只在活動前測試完使用，會把所有人的答案、統計與排行榜全部刪除。</p>
+      <p class="hint" style="text-align:left; margin:0;">
+        「清除本題作答」會把這一題的代表答案與組員作答刪掉，讓這題可以重來。
+        「清除所有作答紀錄」會清空全部答案、統計與排行榜，只在活動前測試完使用。
+      </p>
     </div>
 
   </section>

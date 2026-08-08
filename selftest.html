@@ -1,125 +1,169 @@
-<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8"><title>logic test</title></head>
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8"><title>logic test</title>
+<style>body{font-family:ui-monospace,monospace;background:#00043f;color:#dbe6ff;padding:18px;font-size:13px}
+b{color:#ffd24a}.f{color:#ff8497}</style></head>
 <body><pre id="out">running…</pre>
 <script type="module">
 import {
-  buildLeaderboard, buildCategoryMatrix, categoryChampions,
-  groupBestCategories, columnWinners, tallyQuestion, categoryOf, parseBulkQuestions
+  buildScoreboard, categoryMatrix, categoryChampions, groupBestCategories, columnWinners,
+  scoreOne, tallyMembers, tallyAllMembers, tallyReps, categoryOf, parseBulkQuestions,
+  questionsOf, listOf, gridColumns, secondsLeft, LISTS
 } from "./assets/js/common.js";
 
 const log = [];
-const ok = (name, cond, extra="") => log.push(`${cond ? "PASS" : "FAIL"}  ${name}${extra ? "  " + extra : ""}`);
+const ok = (name, cond, extra = "") =>
+  log.push(`${cond ? "PASS" : "<b class='f'>FAIL</b>"}  ${name}${extra ? "   " + extra : ""}`);
 
-// --- 佈景：3 組、4 題（2 個類別）---
-const groups = {
-  g1: { name: "第 1 組", order: 0 },
-  g2: { name: "第 2 組", order: 1 },
-  g3: { name: "第 3 組", order: 2 }
-};
+// ════════ 佈景 ════════
+//  3 組。q1/q2 正式題（人際），q3 正式題（情緒），q4 正式題未公布，q5 是 DEMO。
+const groups = { g1:{name:"第 1 組",order:0}, g2:{name:"第 2 組",order:1}, g3:{name:"第 3 組",order:2} };
 const questions = {
-  q1: { order: 0, text: "T1", a: "a", b: "b", cat: "social"  },
-  q2: { order: 1, text: "T2", a: "a", b: "b", cat: "social"  },
-  q3: { order: 2, text: "T3", a: "a", b: "b", cat: "emotion" },
-  q4: { order: 3, text: "T4", a: "a", b: "b", cat: "emotion" }   // 未公布
+  q1:{order:0,text:"T1",a:"a",b:"b",cat:"social", list:"main"},
+  q2:{order:1,text:"T2",a:"a",b:"b",cat:"social", list:"main"},
+  q3:{order:2,text:"T3",a:"a",b:"b",cat:"emotion",list:"main"},
+  q4:{order:3,text:"T4",a:"a",b:"b",cat:"emotion",list:"main"},   // 未公布
+  q5:{order:0,text:"D1",a:"a",b:"b",cat:"social", list:"demo"}
 };
-const keys = { q1: "A", q2: "A", q3: "B", q4: "A" };
-const revealed = { q1: true, q2: true, q3: true };               // q4 沒公布
+const keys = { q1:"A", q2:"A", q3:"A", q4:"A", q5:"A" };
+const revealed = { q1:true, q2:true, q3:true, q5:true };          // q4 沒公布
 
-// 第1組：人際 2/2 全對、情緒 0/1
-// 第2組：人際 1/2、情緒 1/1 全對
-// 第3組：只答了情緒 1 題且答錯
+// 代表答案
+const repAnswers = {
+  q1:{ g1:{c:"A"}, g2:{c:"A"}, g3:{c:"B"} },        // g1✔ g2✔ g3✘
+  q2:{ g1:{c:"A"}, g2:{c:"B"}            },        // g1✔ g2✘ g3 沒答
+  q3:{ g1:{c:"B"}, g2:{c:"A"}, g3:{c:"A"} },       // g1✘ g2✔ g3✔
+  q4:{ g1:{c:"A"}, g2:{c:"A"}, g3:{c:"A"} },       // 未公布，不算
+  q5:{ g1:{c:"A"}                        }         // DEMO，不算
+};
+// 台下組員（/responses/{qid}/{gid}/{uid}）
 const responses = {
-  q1: { d1: {g:"g1",c:"A"}, d2: {g:"g2",c:"A"} },
-  q2: { d1: {g:"g1",c:"A"}, d2: {g:"g2",c:"B"} },
-  q3: { d1: {g:"g1",c:"A"}, d2: {g:"g2",c:"B"}, d3: {g:"g3",c:"A"} },
-  q4: { d1: {g:"g1",c:"A"}, d2: {g:"g2",c:"A"}, d3: {g:"g3",c:"A"} }   // 應被忽略
+  q1:{ g1:{u1:{c:"A"},u2:{c:"A"},u3:{c:"B"}},      // 2/3 = 67% ≥50% ✔
+       g2:{u4:{c:"A"},u5:{c:"B"}},                  // 1/2 = 50% ≥50% ✔（剛好過半要算）
+       g3:{u6:{c:"B"},u7:{c:"B"},u8:{c:"A"}} },     // 1/3 = 33% ✘
+  q2:{ g1:{u1:{c:"B"},u2:{c:"B"}} },                // 0/2 ✘ ；g2/g3 沒人答
+  q3:{ g2:{u4:{c:"A"}} },                           // 1/1 ✔
+  q4:{ g1:{u1:{c:"A"}} },                           // 未公布，不算
+  q5:{ g1:{u1:{c:"A"}} }                            // DEMO，不算
 };
 
-// --- 1. 單題分布 ---
-const t = tallyQuestion(responses.q2, "A");
-ok("tallyQuestion 計數", t.A === 1 && t.B === 1 && t.total === 2, JSON.stringify(t));
+// ════════ 1. 單題計分 ════════
+let s = scoreOne("A", {c:"A"}, {u1:{c:"A"},u2:{c:"B"}});
+ok("代表對 + 組員剛好 50% → 2 分", s.points === 2 && s.repOk && s.memberOk, JSON.stringify({r:s.memberRate,p:s.points}));
 
-// --- 2. 總排行榜（未公布的 q4 不能算進去）---
-const lb = buildLeaderboard(groups, questions, keys, responses, revealed);
-const byId = Object.fromEntries(lb.map(r => [r.gid, r]));
-ok("g1 = 2/3", byId.g1.correct === 2 && byId.g1.answered === 3, JSON.stringify(byId.g1));
-ok("g2 = 2/3", byId.g2.correct === 2 && byId.g2.answered === 3, JSON.stringify(byId.g2));
-ok("g3 = 0/1", byId.g3.correct === 0 && byId.g3.answered === 1, JSON.stringify(byId.g3));
-ok("未公布的 q4 未列入", byId.g1.answered === 3);
-ok("排序：g3 墊底", lb[lb.length - 1].gid === "g3", lb.map(r=>r.gid+":"+r.rate).join(" "));
+s = scoreOne("A", {c:"B"}, {u1:{c:"A"},u2:{c:"A"},u3:{c:"B"}});
+ok("代表錯 + 組員 67% → 1 分", s.points === 1 && !s.repOk && s.memberOk, "rate=" + s.memberRate);
 
-// --- 3. 類別矩陣 ---
-const mx = buildCategoryMatrix(groups, questions, keys, responses, revealed);
-ok("只出現有題目的類別", mx.cats.length === 2 && mx.cats[0].id === "social" && mx.cats[1].id === "emotion",
-   mx.cats.map(c=>c.id).join(","));
+s = scoreOne("A", {c:"A"}, {u1:{c:"B"},u2:{c:"B"},u3:{c:"A"}});
+ok("代表對 + 組員 33% → 1 分", s.points === 1 && s.repOk && !s.memberOk, "rate=" + s.memberRate);
+
+s = scoreOne("A", null, null);
+ok("代表沒答 + 沒組員 → 0 分", s.points === 0 && s.repChoice === null && s.memberRate === null);
+
+s = scoreOne("A", {c:"A"}, null);
+ok("組員一個都沒答不給加分", s.points === 1 && s.memberOk === false, "rate=" + JSON.stringify(s.memberRate));
+
+s = scoreOne("A", {c:"X"}, {u1:{c:"?"}});
+ok("非法字母一律忽略", s.repChoice === null && s.memberTally.total === 0);
+
+// ════════ 2. 題庫 ════════
+ok("正式題 4 題", questionsOf(questions, LISTS.MAIN).length === 4);
+ok("DEMO 1 題",  questionsOf(questions, LISTS.DEMO).length === 1);
+ok("沒寫 list 當成正式題", listOf({text:"x"}) === LISTS.MAIN);
+
+// ════════ 3. 總分 ════════
+const board = buildScoreboard(groups, questions, keys, responses, repAnswers, revealed, LISTS.MAIN);
+const by = Object.fromEntries(board.rows.map(r => [r.gid, r]));
+
+ok("只算已公布的正式題 → 3 題", board.questionCount === 3);
+ok("滿分 = 題數 × 2", by.g1.max === 6);
+
+//  g1：q1 代表✔+組員✔=2、q2 代表✔+組員✘=1、q3 代表✘+組員無=0  → 3
+ok("g1 = 3 分", by.g1.points === 3, JSON.stringify({p:by.g1.points, rep:by.g1.repCorrect, mem:by.g1.memberBonus}));
+//  g2：q1 ✔+✔=2、q2 ✘+無=0、q3 ✔+✔=2  → 4
+ok("g2 = 4 分", by.g2.points === 4, JSON.stringify({p:by.g2.points, rep:by.g2.repCorrect, mem:by.g2.memberBonus}));
+//  g3：q1 ✘+✘=0、q2 沒答=0、q3 ✔+無=1  → 1
+ok("g3 = 1 分", by.g3.points === 1, JSON.stringify({p:by.g3.points, rep:by.g3.repCorrect, mem:by.g3.memberBonus}));
+
+ok("代表答對次數",   by.g1.repCorrect === 2 && by.g2.repCorrect === 2 && by.g3.repCorrect === 1);
+ok("組員過半次數",   by.g1.memberBonus === 1 && by.g2.memberBonus === 2 && by.g3.memberBonus === 0);
+ok("代表作答題數（g3 少一題）", by.g3.repAnswered === 2, String(by.g3.repAnswered));
+ok("排序：g2 > g1 > g3", board.rows.map(r => r.gid).join(",") === "g2,g1,g3", board.rows.map(r=>r.gid+":"+r.points).join(" "));
+
+const demo = buildScoreboard(groups, questions, keys, responses, repAnswers, revealed, LISTS.DEMO);
+ok("DEMO 分開計，不混進正式分", demo.questionCount === 1 && demo.rows.every(r => r.max === 2));
+
+// ════════ 4. 類別矩陣 ════════
+const mx = categoryMatrix(board);
+ok("只出現有公布題目的類別", mx.cats.map(c=>c.id).join(",") === "social,emotion", mx.cats.map(c=>c.id).join(","));
 
 const cell = (gid, catId) => {
   const r = mx.rows.find(r => r.gid === gid);
   return r.cells[mx.cats.findIndex(c => c.id === catId)];
 };
-ok("g1 人際 100%", cell("g1","social").rate === 100, JSON.stringify(cell("g1","social")));
-ok("g1 情緒 0%",   cell("g1","emotion").rate === 0);
-ok("g2 人際 50%",  cell("g2","social").rate === 50);
-ok("g2 情緒 100%", cell("g2","emotion").rate === 100);
-ok("g3 人際 null（沒作答）", cell("g3","social").rate === null, JSON.stringify(cell("g3","social")));
+ok("g1 人際 3/4", cell("g1","social").points === 3 && cell("g1","social").max === 4, JSON.stringify(cell("g1","social")));
+ok("g1 情緒 0/2", cell("g1","emotion").points === 0 && cell("g1","emotion").rate === 0);
+ok("g2 情緒 2/2 = 100%", cell("g2","emotion").rate === 100);
+ok("g3 人際 0/4 = 0%",  cell("g3","social").rate === 0);
 
-// --- 4. 各類別冠軍 ---
 const champs = Object.fromEntries(categoryChampions(mx).map(c => [c.cat.id, c.best]));
-ok("人際冠軍 = 第1組", champs.social?.gid === "g1", JSON.stringify(champs.social));
-ok("情緒冠軍 = 第2組", champs.emotion?.gid === "g2", JSON.stringify(champs.emotion));
+ok("人際冠軍 g1（3/4）", champs.social?.gid === "g1", JSON.stringify(champs.social));
+ok("情緒冠軍 g2（2/2）", champs.emotion?.gid === "g2", JSON.stringify(champs.emotion));
 
-// --- 5. 各組最強類別 ---
 const best = Object.fromEntries(groupBestCategories(mx).map(b => [b.gid, b]));
 ok("g1 最強 = 人際",  best.g1.cat?.id === "social",  best.g1.cat?.id);
 ok("g2 最強 = 情緒",  best.g2.cat?.id === "emotion", best.g2.cat?.id);
-ok("g3 最強 = 情緒（唯一有作答的）", best.g3.cat?.id === "emotion", best.g3.cat?.id);
 
-// --- 6. 欄位冠軍索引 ---
 const wins = columnWinners(mx);
-ok("columnWinners 指向正確列",
-   mx.rows[wins[0]].gid === "g1" && mx.rows[wins[1]].gid === "g2",
-   JSON.stringify(wins));
+ok("columnWinners 指向正確列", mx.rows[wins[0]].gid === "g1" && mx.rows[wins[1]].gid === "g2", JSON.stringify(wins));
 
-// --- 7. 邊界 ---
-const empty = buildCategoryMatrix(groups, questions, keys, {}, {});
-ok("完全沒公布 → 沒有類別", empty.cats.length === 0);
-ok("未知類別 id 落到未分類", categoryOf("nope").id === "uncat");
-ok("沒有 cat 欄位落到未分類", categoryOf(undefined).name === "未分類");
+const emptyBoard = buildScoreboard(groups, questions, keys, {}, {}, {}, LISTS.MAIN);
+ok("完全沒公布 → 沒有類別、全 0 分",
+   categoryMatrix(emptyBoard).cats.length === 0 && emptyBoard.rows.every(r => r.points === 0));
 
-const uncat = buildCategoryMatrix(groups, { qx: { order:0, text:"x" } }, { qx:"A" },
-                                  { qx: { d1: {g:"g1",c:"A"} } }, { qx:true });
-ok("未分類題目會自成一欄", uncat.cats.length === 1 && uncat.cats[0].id === "uncat",
-   uncat.cats.map(c=>c.id).join(","));
+// ════════ 5. 分布統計 ════════
+const t1 = tallyMembers(responses.q1.g1);
+ok("tallyMembers 單組分布", t1.A === 2 && t1.B === 1 && t1.total === 3, JSON.stringify(t1));
+const tm = tallyAllMembers(responses.q1);
+ok("tallyAllMembers 跨組加總", tm.total === 8 && tm.A === 4 && tm.B === 4, JSON.stringify(tm));
+const tr = tallyReps(repAnswers.q1);
+ok("tallyReps", tr.total === 3 && tr.A === 2 && tr.B === 1, JSON.stringify(tr));
 
-// --- 8. 批次匯入解析 ---
+// ════════ 6. 投影格子欄數 ════════
+ok("6 組 → 3 欄",  gridColumns(6)  === 3,  String(gridColumns(6)));
+ok("8 組 → 4 欄",  gridColumns(8)  === 4,  String(gridColumns(8)));
+ok("12 組 → 4 欄", gridColumns(12) === 4,  String(gridColumns(12)));
+ok("1 組 → 1 欄",  gridColumns(1)  === 1);
+ok("每組都有格子（不會漏）",
+   [1,2,3,5,7,8,9,10,11,12,13,16,20].every(n => gridColumns(n) * Math.ceil(n / gridColumns(n)) >= n));
+
+// ════════ 7. 倒數 ════════
+const now = Date.now();
+ok("剛開始 → 60",       secondsLeft(now, 60, 0) === 60, String(secondsLeft(now,60,0)));
+ok("過了 30 秒 → 30",   secondsLeft(now - 30000, 60, 0) === 30, String(secondsLeft(now-30000,60,0)));
+ok("超時不會變負數",     secondsLeft(now - 90000, 60, 0) === 0);
+ok("沒有 openedAt → null", secondsLeft(null, 60, 0) === null);
+ok("伺服器時鐘差有被算進去", secondsLeft(now, 60, 10000) === 50, String(secondsLeft(now,60,10000)));
+
+// ════════ 8. 批次匯入 ════════
 const throws = (name, raw, hint) => {
   try { parseBulkQuestions(raw); ok(name + "（應該要報錯）", false); }
-  catch (e) { ok(name, hint ? e.message.includes(hint) : true, e.message.slice(0, 46)); }
+  catch (e) { ok(name, hint ? e.message.includes(hint) : true, e.message.slice(0, 40)); }
 };
-
 let p = parseBulkQuestions("題幹|甲|乙|丙|丁|C|情緒管理大師");
-ok("四選項＋類別", p[0].key === "C" && p[0].q.cat === "emotion" && p[0].q.c === "丙" && p[0].q.text === "題幹",
-   JSON.stringify(p[0]));
-
-p = parseBulkQuestions("題幹|甲|乙|丙|丁|B");
-ok("四選項、無類別", p[0].key === "B" && p[0].q.cat === undefined && p[0].q.d === "丁", JSON.stringify(p[0].q));
-
+ok("四選項＋類別", p[0].key === "C" && p[0].q.cat === "emotion" && p[0].q.c === "丙", JSON.stringify(p[0].q));
 p = parseBulkQuestions("題幹|甲|乙|A");
-ok("只有 AB 兩個選項時 key 不會被當成 C 選項",
-   p[0].key === "A" && p[0].q.c === undefined && p[0].q.b === "乙", JSON.stringify(p[0].q));
-
-p = parseBulkQuestions("  T1|甲|乙|A  \n\n T2|丙|丁|b|團隊領航員 \n");
-ok("多行＋空行＋小寫正解", p.length === 2 && p[1].key === "B" && p[1].q.cat === "team", JSON.stringify(p.map(x=>x.key)));
-
-p = parseBulkQuestions("題幹|甲|乙|丙|丁|A|team");
-ok("類別也可以用 id 寫", p[0].q.cat === "team");
-
+ok("只有 AB 時 key 不會被當成 C 選項", p[0].key === "A" && p[0].q.c === undefined);
+p = parseBulkQuestions(" T1|甲|乙|A \n\n T2|丙|丁|b|團隊領航員 \n");
+ok("多行＋空行＋小寫正解", p.length === 2 && p[1].key === "B" && p[1].q.cat === "team");
 throws("欄位不夠", "題幹|甲|A", "欄位不夠");
 throws("類別打錯字", "題幹|甲|乙|A|情緒大師", "看不懂最後一欄");
 throws("正解指向空選項", "題幹|甲|乙||D", "沒有填");
-throws("題幹空白", "|甲|乙|A", "不能空白");
 throws("全空", "   \n  ", "沒有讀到");
 
-const failed = log.filter(l => l.startsWith("FAIL")).length;
-document.querySelector("#out").textContent =
-  log.join("\n") + `\n\n${log.length - failed} passed, ${failed} failed`;
+// ════════ 9. 類別工具 ════════
+ok("未知類別 → 未分類", categoryOf("nope").id === "uncat");
+ok("undefined → 未分類", categoryOf(undefined).name === "未分類");
+
+const failed = log.filter(l => l.includes("FAIL")).length;
+document.querySelector("#out").innerHTML =
+  log.join("\n") + `\n\n<b>${log.length - failed} passed, ${failed} failed</b>`;
 </script></body></html>

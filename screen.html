@@ -9,73 +9,208 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
 <style>
-  /* 投影用：固定 16:9，字級隨畫面縮放，直接對應 Canva 簡報的比例 */
+  /* 投影用：固定 16:9，字級隨畫面縮放 */
   html, body { height: 100%; overflow: hidden; }
+
   .stage {
     position: relative;
     width: 100vw; height: 100vh;
     display: flex; flex-direction: column;
-    padding: 3.2vh 4vw;
+    padding: 2.6vh 3vw;
     font-size: 1.85vh;
   }
-  .stage .logo { width: 22vh; margin: 0; -webkit-mask-image: radial-gradient(ellipse 62% 62% at 50% 50%, #000 58%, transparent 100%); mask-image: radial-gradient(ellipse 62% 62% at 50% 50%, #000 58%, transparent 100%); }
-  .top { display: flex; align-items: center; justify-content: space-between; }
-  .top .qbadge { font-size: 2.6vh; padding: 1.1vh 2.4vw; }
-  .top .qbadge b { font-size: 3.4vh; }
+  .stage .logo { width: 20vh; margin: 0;
+    -webkit-mask-image: radial-gradient(ellipse 62% 62% at 50% 50%, #000 58%, transparent 100%);
+            mask-image: radial-gradient(ellipse 62% 62% at 50% 50%, #000 58%, transparent 100%); }
 
-  .body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 2.4vh; min-height: 0; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 2vw; }
+  .top .qbadge { font-size: 2.4vh; padding: 1vh 2vw; }
+  .top .qbadge b { font-size: 3.1vh; }
 
-  .big-q {
-    text-align: center;
-    font-size: 4.6vh; font-weight: 900; line-height: 1.35;
-    color: #08205c;
-    background: linear-gradient(180deg, #fff, #e6efff);
-    border: .5vh solid var(--cyan);
-    box-shadow: 0 0 4vh rgba(53,168,255,.7);
-    padding: 3.4vh 4vw;
-    clip-path: polygon(3vh 0, 100% 0, 100% calc(100% - 3vh), calc(100% - 3vh) 100%, 0 100%, 0 3vh);
-  }
+  .body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 2vh; min-height: 0; }
 
-  .screen-bars { display: grid; gap: 1.6vh; }
-  .screen-bars .bar-key   { width: 6vh; height: 6.6vh; font-size: 3.4vh; }
-  .screen-bars .bar-track { height: 5.6vh; border-radius: 1vh; }
-  .screen-bars .bar-num   { min-width: 16vw; font-size: 2.6vh; }
-  .screen-bars .bar-opt   { flex: 0 0 26vw; font-size: 2.2vh; font-weight: 700; color: #d8e6ff;
-                            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-  .huge-letter { font-size: 32vh; }
-
-  .counter { text-align: center; }
-  .counter .n { font-size: 16vh; line-height: 1; font-weight: 900; }
-  .counter .cap { font-size: 3vh; color: var(--txt-dim); letter-spacing: .2em; }
-
-  /* 組別多的時候由 screen.js 調小 --rfs，避免排行榜被切掉。
-     選擇器要用 table.rank-screen 才蓋得過 style.css 的 table.rank */
-  table.rank-screen { width: 100%; --rfs: 2.8vh; font-size: var(--rfs); }
-  table.rank-screen th { font-size: calc(var(--rfs) * .72); padding: calc(var(--rfs) * .3) .8vw; }
-  table.rank-screen td { padding: calc(var(--rfs) * .4) .8vw; line-height: 1.25; }
-  table.rank-screen tr.top1 td { font-size: calc(var(--rfs) * 1.28); }
-
-  .foot { display: flex; align-items: center; justify-content: space-between; gap: 2vw; color: var(--txt-dim); font-size: 1.9vh; }
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 2vw;
+          color: var(--txt-dim); font-size: 1.8vh; }
   .foot b { color: var(--gold); }
   #s-tip { flex: 1 1 auto; text-align: center; color: var(--gold-lt); }
 
-  /* 類別矩陣，字級由 screen.js 依組別數量調整。
-     td 的 font-size 一定要在這裡重寫 —— style.css 的 table.matrix td 是固定 px，
-     只設在 table 上的話會被子層蓋掉，字就縮不下去。 */
+  /* ---------- 題幹 ---------- */
+  .big-q {
+    text-align: center;
+    font-size: 3.9vh; font-weight: 900; line-height: 1.32;
+    color: #08205c;
+    background: linear-gradient(180deg, #fff, #e6efff);
+    border: .45vh solid var(--cyan);
+    box-shadow: 0 0 4vh rgba(53,168,255,.7);
+    padding: 2.4vh 3vw;
+    clip-path: polygon(2.6vh 0, 100% 0, 100% calc(100% - 2.6vh), calc(100% - 2.6vh) 100%, 0 100%, 0 2.6vh);
+  }
+  .opt-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2vh 2vw; }
+  .opt-mini { display: flex; align-items: center; gap: 1vw; font-size: 2.3vh; font-weight: 700; color: #dce9ff; }
+  .opt-mini .k {
+    flex: 0 0 auto; width: 4.4vh; height: 4.9vh; display: grid; place-items: center;
+    font-size: 2.5vh; font-weight: 900; color: #6b3b00;
+    background: linear-gradient(180deg, #fff2b8, var(--gold) 50%, #e09a00);
+    clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  }
+
+  /* ---------- 倒數計時 ---------- */
+  .countdown {
+    position: relative;
+    flex: 0 0 auto;
+    width: 15vh; height: 15vh;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    font-size: 7.6vh; font-weight: 900; line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--cyan-lt);
+    background: radial-gradient(circle at 50% 45%, rgba(20,50,160,.9), rgba(2,8,44,.95));
+    box-shadow: 0 0 0 .5vh var(--cyan), 0 0 5vh rgba(53,168,255,.7), inset 0 0 4vh rgba(53,168,255,.35);
+  }
+  .countdown.warn {
+    color: var(--gold-lt);
+    box-shadow: 0 0 0 .5vh var(--gold), 0 0 6vh rgba(255,200,31,.8), inset 0 0 4vh rgba(255,200,31,.35);
+  }
+  .countdown.danger {
+    color: #ffd3db;
+    box-shadow: 0 0 0 .6vh var(--bad), 0 0 8vh rgba(255,84,112,.95), inset 0 0 5vh rgba(255,84,112,.4);
+    animation: cd-throb .55s ease-in-out infinite;
+  }
+  @keyframes cd-throb { 0%,100% { transform: scale(1); } 50% { transform: scale(1.09); } }
+
+  /* 最後幾秒整個畫面微震 */
+  .stage.shake { animation: shake .28s linear infinite; }
+  @keyframes shake {
+    0%,100% { transform: translate(0,0); }
+    25%     { transform: translate(.28vh,-.2vh); }
+    50%     { transform: translate(-.24vh,.24vh); }
+    75%     { transform: translate(.2vh,.16vh); }
+  }
+
+  /* 掠過畫面的掃描光，製造緊張感 */
+  .sweep {
+    position: absolute; inset: 0; pointer-events: none; overflow: hidden; opacity: 0;
+    transition: opacity .4s ease;
+  }
+  .stage.tense .sweep { opacity: 1; }
+  .sweep::before {
+    content: ""; position: absolute; top: -20%; left: -30%;
+    width: 30%; height: 140%;
+    background: linear-gradient(90deg, transparent, rgba(120,190,255,.16), transparent);
+    transform: rotate(9deg);
+    animation: sweep 2.6s linear infinite;
+  }
+  @keyframes sweep { to { left: 130%; } }
+
+  /* ---------- 各組代表答案格 ---------- */
+  .grid {
+    display: grid;
+    gap: 1.1vh 1vw;
+    flex: 1 1 auto;
+    min-height: 0;
+    align-content: stretch;
+  }
+  .cellbox {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: .3vh;
+    border-radius: 1vh;
+    border: .28vh solid rgba(53,168,255,.4);
+    background: linear-gradient(180deg, rgba(8,22,96,.75), rgba(2,8,48,.8));
+    overflow: hidden;
+    transition: box-shadow .3s ease, border-color .3s ease, background .3s ease;
+  }
+  .cellbox .gname {
+    font-size: var(--cell-name, 1.9vh); font-weight: 800; color: #b8cdf5;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 92%;
+  }
+  .cellbox .glet {
+    font-size: var(--cell-let, 6vh); font-weight: 900; line-height: 1;
+    color: #33477e;
+  }
+  .cellbox .waiting { font-size: var(--cell-name, 1.9vh); color: #4a5a8c; font-weight: 700; letter-spacing: .2em; }
+
+  /* 已確認 */
+  .cellbox.done {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, rgba(70,52,6,.85), rgba(28,20,2,.9));
+    box-shadow: 0 0 2.4vh rgba(255,200,31,.55), inset 0 0 2vh rgba(255,200,31,.18);
+    animation: cell-pop .45s cubic-bezier(.2,1.6,.4,1);
+  }
+  .cellbox.done .glet {
+    background: linear-gradient(180deg, #fff6cf, var(--gold) 45%, #cf8b00);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 1.4vh rgba(255,200,31,.8));
+  }
+  .cellbox.done .gname { color: var(--gold-lt); }
+  @keyframes cell-pop { from { transform: scale(.86); } to { transform: scale(1); } }
+
+  /* 公布答案後：答對 / 答錯 */
+  .cellbox.right { border-color: var(--ok);  box-shadow: 0 0 2.6vh rgba(47,217,107,.6); }
+  .cellbox.right .glet { background: linear-gradient(180deg,#d6ffe6,#2fd96b 50%,#0f8a3d);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .cellbox.right  .gname { color: #9dffc4; }
+  .cellbox.wrongc { border-color: rgba(255,84,112,.55); opacity: .62; }
+  .cellbox.wrongc .glet { color: #ff8497; background: none; -webkit-text-fill-color: #ff8497; }
+
+  .cellbox .mark { position: absolute; top: .5vh; right: .7vw; font-size: 1.9vh; }
+
+  /* ---------- 公布答案 ---------- */
+  .huge-letter { font-size: 26vh; }
+
+  /* ---------- 說明頁 ---------- */
+  .explain { display: flex; gap: 2.5vw; align-items: stretch; min-height: 0; flex: 1 1 auto; }
+  .explain .txt {
+    flex: 1 1 auto; min-width: 0; overflow: auto;
+    font-size: var(--ex-fs, 2.6vh); line-height: 1.62; color: #e6eeff;
+    white-space: pre-wrap;
+  }
+  .explain .pic { flex: 0 0 42%; display: grid; place-items: center; min-width: 0; }
+  .explain .pic img { max-width: 100%; max-height: 62vh; border-radius: 1.2vh;
+    box-shadow: 0 0 0 .3vh rgba(255,200,31,.4), 0 2vh 5vh rgba(0,0,0,.6); }
+  .explain.noimg .pic { display: none; }
+  .explain.noimg .txt { text-align: center; }
+
+  /* ---------- 統計條 ---------- */
+  .screen-bars { display: grid; gap: 1.3vh; }
+  .screen-bars .bar-key   { width: 5.4vh; height: 6vh; font-size: 3vh; }
+  .screen-bars .bar-track { height: 5vh; border-radius: 1vh; }
+  .screen-bars .bar-num   { min-width: 15vw; font-size: 2.4vh; }
+  .screen-bars .bar-opt   { flex: 0 0 24vw; font-size: 2.1vh; font-weight: 700; color: #d8e6ff;
+                            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---------- 排行榜 ---------- */
+  table.rank.rank-screen { width: 100%; --rfs: 2.8vh; }
+  table.rank.rank-screen th { font-size: calc(var(--rfs) * .7); padding: calc(var(--rfs) * .3) .8vw; }
+  table.rank.rank-screen td { font-size: var(--rfs); padding: calc(var(--rfs) * .4) .8vw; line-height: 1.22; }
+  table.rank.rank-screen tr.top1 td { font-size: calc(var(--rfs) * 1.26); }
+
+  /* ---------- 類別矩陣 ---------- */
   table.matrix.matrix-screen { --mfs: 2.2vh; }
   table.matrix.matrix-screen th,
   table.matrix.matrix-screen td { padding: calc(var(--mfs) * .32) .5vw; font-size: var(--mfs); line-height: 1.18; }
   table.matrix.matrix-screen thead th { font-size: calc(var(--mfs) * .8); }
   table.matrix.matrix-screen td small { font-size: calc(var(--mfs) * .56); }
+
+  /* ---------- 音效解鎖 ---------- */
+  #sound-gate {
+    position: fixed; inset: 0; z-index: 90;
+    display: grid; place-items: center;
+    background: rgba(0,3,30,.92);
+    backdrop-filter: blur(3px);
+  }
+  #sound-gate .box { text-align: center; max-width: 60vw; }
+  #sound-gate .btn { font-size: 2.6vh; padding: 2vh 4vw; }
 </style>
 </head>
 <body>
-<div class="stage">
+<div class="stage" id="stage">
+  <div class="sweep"></div>
 
   <div class="top">
     <img class="logo" src="assets/img/logo.png" alt="大學星攻略">
-    <span class="cat-pill" id="s-cat" style="font-size:2.2vh; padding:.8vh 1.6vw;">—</span>
+    <span class="cat-pill" id="s-cat" style="font-size:2.1vh; padding:.7vh 1.4vw;">—</span>
+    <span class="pill" id="s-list" style="font-size:1.8vh;">正式題目</span>
     <span class="qbadge" id="s-badge">第 <b>–</b> 題</span>
   </div>
 
@@ -88,7 +223,21 @@
     <span id="s-tip"></span>
     <span>崇德志工社　<b>大學星攻略</b></span>
   </div>
+</div>
 
+<!-- 瀏覽器規定要有使用者手勢才能播音效 -->
+<div id="sound-gate" class="hidden">
+  <div class="box">
+    <h2 class="title-gold" style="font-size:4.4vh; margin:0 0 1.4vh;">投影統計頁</h2>
+    <p class="hint" style="font-size:2.2vh; margin:0 0 3vh;">
+      瀏覽器要求先有一次點擊才能播放音效。<br>
+      按下之後請按 <b style="color:var(--gold-lt)">F11</b> 進入全螢幕。
+    </p>
+    <button class="btn" id="btn-sound">🔊 開啟音效並開始</button>
+    <p class="hint" style="font-size:1.8vh; margin-top:2vh;">
+      <a href="#" id="btn-nosound" style="color:var(--txt-dim)">不要音效，直接進入</a>
+    </p>
+  </div>
 </div>
 
 <script type="module" src="assets/js/screen.js"></script>

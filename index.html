@@ -18,68 +18,120 @@
 
   <img class="logo" src="assets/img/logo.png" alt="大學星攻略">
 
+  <!-- 進場後常駐的身分列 -->
+  <div class="idbar hidden" id="idbar">
+    <span class="pill" id="id-group">—</span>
+    <span class="pill" id="id-role">—</span>
+    <button class="btn ghost mini" id="btn-leave">切換</button>
+  </div>
+
   <!-- ===== 1. 選組別 ===== -->
   <section id="scr-group" class="stack hidden">
     <img class="hero" src="assets/img/hero.jpg" alt="大學星攻略 — 創造我的大學價值">
     <div class="card stack">
       <div class="field">
-        <label for="sel-group">請選擇你的組別</label>
+        <label for="sel-group">你是哪一組？</label>
         <select id="sel-group"><option value="">載入中…</option></select>
       </div>
-      <button id="btn-join" class="btn wide" disabled>進入遊戲 ★</button>
-      <p class="hint">選錯了？進場後點右上角組別可以重選。</p>
+      <button id="btn-group-next" class="btn wide" disabled>下一步 →</button>
     </div>
   </section>
 
-  <!-- ===== 2. 等待中 ===== -->
+  <!-- ===== 2. 選身分 ===== -->
+  <section id="scr-role" class="stack hidden">
+    <div class="card stack">
+      <p class="hint" style="margin:0;">你在 <b id="role-group" style="color:var(--gold)">—</b> 擔任什麼角色？</p>
+
+      <button class="rolecard" id="pick-rep">
+        <span class="ico">🎤</span>
+        <span class="txt">
+          <b>上台代表</b>
+          <small>一組只有一位。看得到組員的選擇比例，由你決定最終答案。</small>
+          <small class="taken" id="rep-taken"></small>
+        </span>
+      </button>
+
+      <button class="rolecard" id="pick-member">
+        <span class="ico">📱</span>
+        <span class="txt">
+          <b>台下組員</b>
+          <small>選出你認為的答案，你的選擇會即時傳給你們的代表參考。</small>
+        </span>
+      </button>
+
+      <button class="btn ghost" id="btn-role-back">← 重新選組別</button>
+    </div>
+  </section>
+
+  <!-- ===== 3. 等待中 ===== -->
   <section id="scr-wait" class="stack hidden" style="flex:1 1 auto; justify-content:center; align-content:center;">
     <div class="center stack">
       <div class="spin"></div>
       <h2 class="title-gold" style="font-size:26px; margin:6px 0;">等待主持人出題</h2>
       <p class="hint" id="wait-msg">請把手機拿好，題目馬上就來 ✦</p>
-      <div class="center"><span class="pill" id="wait-group">—</span></div>
     </div>
-    <div class="spacer"></div>
-    <button id="btn-regroup" class="btn ghost">重新選擇組別</button>
   </section>
 
-  <!-- ===== 3. 作答 ===== -->
+  <!-- ===== 4. 作答 ===== -->
   <section id="scr-question" class="stack hidden">
-    <div class="center"><span class="qbadge">第 <b id="q-no">1</b> 題</span></div>
+    <div class="qhead">
+      <span class="qbadge">第 <b id="q-no">1</b> 題</span>
+      <span class="timer" id="q-timer">–</span>
+    </div>
     <div class="center" style="margin-top:10px;"><span class="cat-pill" id="q-cat">—</span></div>
 
     <div class="qpanel"><p id="q-text">…</p></div>
 
+    <!-- 代表專屬：組員即時選擇比例 -->
+    <div class="card stack hidden" id="rep-panel" style="margin-bottom:14px;">
+      <div class="row" style="justify-content:space-between; align-items:baseline;">
+        <strong class="title-gold" style="font-size:16px;">組員的選擇</strong>
+        <span class="hint" id="rep-count">0 人已選</span>
+      </div>
+      <div class="bars" id="rep-bars"></div>
+    </div>
+
     <div class="opts" id="opts"></div>
+
+    <!-- 代表專屬：確認鈕 -->
+    <div class="stack hidden" id="rep-confirm-box" style="margin-top:14px;">
+      <button class="btn wide" id="btn-confirm" disabled>確認送出 <b>—</b></button>
+      <p class="hint" style="margin:0;">送出後就不能更改，並且會立刻顯示在投影幕上。</p>
+    </div>
 
     <div class="center" style="margin-top:16px;">
       <span class="pill live"   id="tag-open">開放作答中</span>
       <span class="pill lock hidden" id="tag-lock">已截止作答</span>
     </div>
-    <p class="hint" id="q-hint" style="margin-top:10px;">選好之後就送出，主持人公布前答案不會顯示。</p>
+    <p class="hint" id="q-hint" style="margin-top:10px;"></p>
   </section>
 
-  <!-- ===== 4. 公布答案 ===== -->
+  <!-- ===== 5. 公布答案 ===== -->
   <section id="scr-reveal" class="stack hidden">
     <div class="center"><span class="qbadge">第 <b id="r-no">1</b> 題</span></div>
     <div class="center" style="margin-top:10px;"><span class="cat-pill" id="r-cat">—</span></div>
     <h2 class="title-gold center" style="font-size:26px; margin:14px 0 0;">🎉 正確答案 🎉</h2>
     <div class="reveal-letter" id="r-letter">A</div>
     <div class="center"><span class="verdict" id="r-verdict">—</span></div>
+
     <div class="card stack" style="margin-top:18px;">
-      <p class="hint" style="margin:0 0 4px;">全場作答分布</p>
+      <div class="row" style="justify-content:space-between; align-items:baseline;">
+        <strong class="title-gold" style="font-size:16px;">你們這組</strong>
+        <span class="hint" id="r-points">—</span>
+      </div>
       <div class="bars" id="r-bars"></div>
+      <p class="hint" style="text-align:left; margin:0;" id="r-detail">—</p>
     </div>
-    <p class="hint" style="margin-top:14px;">等待主持人進入下一題…</p>
+    <p class="hint" style="margin-top:14px;">說明在投影幕上，抬頭看一下 ✦</p>
   </section>
 
-  <!-- ===== 5. 最終排行 ===== -->
+  <!-- ===== 6. 最終排行 ===== -->
   <section id="scr-final" class="stack hidden">
     <h2 class="title-gold center" style="font-size:30px; margin:10px 0 2px;">★ 最終排行榜 ★</h2>
-    <p class="hint" style="margin:0 0 14px;">依各組答對率排名</p>
+    <p class="hint" style="margin:0 0 14px;">代表答對 +1，組員答對率過半 +1</p>
     <div class="card">
       <table class="rank">
-        <thead><tr><th style="width:44px;">#</th><th>組別</th><th class="n">答對率</th><th class="n">答對</th></tr></thead>
+        <thead><tr><th style="width:44px;">#</th><th>組別</th><th class="n">總分</th><th class="n">代表</th><th class="n">組員</th></tr></thead>
         <tbody id="final-rows"></tbody>
       </table>
     </div>

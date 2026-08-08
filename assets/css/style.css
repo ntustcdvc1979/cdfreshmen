@@ -105,6 +105,77 @@ code {
 .hint  { color: var(--txt-dim); font-size: 14px; line-height: 1.7; text-align: center; }
 .center{ text-align: center; }
 
+/* ---------- 身分列 ---------- */
+.idbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.idbar .pill { flex: 0 1 auto; }
+.idbar .btn  { margin-left: auto; padding: 6px 12px; font-size: 13px; }
+
+/* ---------- 身分選擇卡 ---------- */
+.rolecard {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  font: inherit;
+  text-align: left;
+  color: #fff;
+  cursor: pointer;
+  border: 2.5px solid var(--cyan);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(23,58,175,.9), rgba(8,24,105,.9));
+  box-shadow: 0 0 16px rgba(53,168,255,.35);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.rolecard:active { transform: scale(.985); }
+.rolecard .ico { flex: 0 0 auto; font-size: 34px; line-height: 1; }
+.rolecard .txt { display: block; }
+.rolecard b     { display: block; font-size: 18px; margin-bottom: 4px; }
+.rolecard small { display: block; font-size: 13px; line-height: 1.6; color: var(--txt-dim); }
+.rolecard small.taken:not(:empty) { margin-top: 6px; color: #ffa5b4; font-weight: 700; }
+.rolecard.disabled {
+  opacity: .5;
+  border-color: rgba(255,84,112,.6);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* ---------- 題目頁頭 + 倒數 ---------- */
+.qhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+.timer {
+  flex: 0 0 auto;
+  min-width: 62px;
+  padding: 4px 14px;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--cyan-lt);
+  border: 2.5px solid var(--cyan);
+  border-radius: 10px;
+  background: rgba(4,14,70,.8);
+  box-shadow: 0 0 16px rgba(53,168,255,.45);
+}
+.timer.warn {
+  color: var(--gold-lt);
+  border-color: var(--gold);
+  box-shadow: 0 0 20px rgba(255,200,31,.6);
+}
+.timer.danger {
+  color: #ffc2cd;
+  border-color: var(--bad);
+  box-shadow: 0 0 26px rgba(255,84,112,.8);
+  animation: throb .6s ease-in-out infinite;
+}
+@keyframes throb { 0%,100% { transform: scale(1); } 50% { transform: scale(1.13); } }
+
 /* ---------- 題號徽章 ---------- */
 .qbadge {
   display: inline-flex;
@@ -199,6 +270,19 @@ code {
 }
 .opt.wrong { opacity: .45; }
 .opt[disabled] { cursor: default; }
+/* 代表已按下確認，鎖定的那一個 */
+.opt.confirmed {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgba(120,90,10,.95), rgba(60,44,4,.95));
+  box-shadow: 0 0 30px rgba(255,200,31,.85);
+}
+.opt.confirmed::after {
+  content: "已送出";
+  position: absolute;
+  top: 6px; right: 10px;
+  font-size: 11px; font-weight: 900; letter-spacing: .08em;
+  color: var(--gold-lt);
+}
 
 /* ---------- 一般按鈕 ---------- */
 .btn {

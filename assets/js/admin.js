@@ -5,7 +5,8 @@
 import {
   db, auth, ref, onValue, set, update, remove,
   signInWithGoogle, consumeRedirectResult, authErrorText, signOut, onAuthStateChanged,
-  PATH, LETTERS, CATEGORIES, UNCATEGORIZED, categoryOf, parseBulkQuestions,
+  PATH, LETTERS, CATEGORIES, UNCATEGORIZED, LISTS, LIST_LABEL,
+  categoryOf, listOf, questionsOf, parseBulkQuestions,
   $, show, toast, toSortedList, escapeHtml, isHost, notHostHtml
 } from "./common.js";
 
@@ -19,6 +20,20 @@ $("#bulk-cats").innerHTML =
 let groups = {}, questions = {}, keys = {};
 let editing = null;            // 正在編輯的題目 id；"new" 代表新增
 let booted = false;
+let curList = LISTS.MAIN;      // 正在編輯哪個題庫
+
+$("#sel-list").addEventListener("change", () => {
+  curList = $("#sel-list").value === LISTS.DEMO ? LISTS.DEMO : LISTS.MAIN;
+  closeEditor();
+});
+
+// 圖片網址即時預覽
+$("#ed-eximg").addEventListener("input", paintPreview);
+function paintPreview() {
+  const url = $("#ed-eximg").value.trim();
+  show($("#ed-preview"), !!url);
+  if (url) $("#ed-preview-img").src = url;
+}
 
 // ---------- 登入 ----------
 onAuthStateChanged(auth, async user => {
@@ -124,10 +139,14 @@ async function swapOrder(path, a, b) {
 //  題目
 // ============================================================
 function paintQuestions() {
-  const list = toSortedList(questions);
-  $("#q-count").textContent = list.length + " 題";
+  const list = questionsOf(questions, curList);
+  const other = questionsOf(questions, curList === LISTS.MAIN ? LISTS.DEMO : LISTS.MAIN).length;
+  $("#q-count").textContent = `${LIST_LABEL[curList]} ${list.length} 題（另一個題庫 ${other} 題）`;
+  $("#sel-list").value = curList;
+
   $("#q-list").innerHTML = list.map((q, i) => {
     const cat = categoryOf(q.cat);
+    const hasEx = !!(q.exText || "").trim() || !!(q.exImg || "").trim();
     return `
     <div class="qitem ${editing === q.id ? "editing" : ""}" data-qid="${escapeHtml(q.id)}">
       <div class="head">
@@ -135,21 +154,25 @@ function paintQuestions() {
         <span class="txt">${escapeHtml(q.text || "（無題幹）")}</span>
         <span class="ans">${keys[q.id] ? "正解 " + keys[q.id] : "⚠ 無正解"}</span>
       </div>
-      <div style="margin-top:8px;"><span class="cat-pill" style="--cat:${cat.color}">${escapeHtml(cat.name)}</span></div>
+      <div class="meta">
+        <span class="cat-pill" style="--cat:${cat.color}">${escapeHtml(cat.name)}</span>
+        <span class="flag ${hasEx ? "ok" : "warn"}">${hasEx ? "有說明" : "⚠ 沒有說明"}</span>
+        ${(q.exImg || "").trim() ? `<span class="flag">含圖片</span>` : ""}
+      </div>
       <div class="row" style="margin-top:10px;">
         <button class="btn ghost mini q-edit">編輯</button>
         <button class="btn ghost mini q-up">↑</button>
         <button class="btn ghost mini q-down">↓</button>
       </div>
     </div>`;
-  }).join("") || `<p class="hint" style="text-align:left;">尚未建立任何題目。</p>`;
+  }).join("") || `<p class="hint" style="text-align:left;">這個題庫還沒有題目。</p>`;
 }
 
 $("#q-list").addEventListener("click", async e => {
   const item = e.target.closest("[data-qid]");
   if (!item) return;
   const qid  = item.dataset.qid;
-  const list = toSortedList(questions);
+  const list = questionsOf(questions, curList);
   const i    = list.findIndex(q => q.id === qid);
 
   if (e.target.classList.contains("q-edit"))       openEditor(qid);
@@ -162,11 +185,20 @@ $("#q-add").addEventListener("click", () => openEditor("new"));
 function openEditor(qid) {
   editing = qid;
   const q = qid === "new" ? {} : (questions[qid] || {});
-  $("#ed-title").textContent = qid === "new" ? "新增題目" : "編輯第 " + (toSortedList(questions).findIndex(x => x.id === qid) + 1) + " 題";
-  $("#ed-cat").value  = q.cat || "";
-  $("#ed-text").value = q.text || "";
+  const no = questionsOf(questions, curList).findIndex(x => x.id === qid) + 1;
+  $("#ed-title").textContent = qid === "new"
+    ? `新增題目（${LIST_LABEL[curList]}）`
+    : `編輯第 ${no} 題（${LIST_LABEL[listOf(q)]}）`;
+
+  $("#ed-cat").value    = q.cat || "";
+  $("#ed-list").value   = qid === "new" ? curList : listOf(q);
+  $("#ed-text").value   = q.text || "";
+  $("#ed-extext").value = q.exText || "";
+  $("#ed-eximg").value  = q.exImg || "";
   for (const L of LETTERS) $("#ed-" + L.toLowerCase()).value = q[L.toLowerCase()] || "";
   $("#ed-key").value = (qid === "new" ? "A" : keys[qid]) || "A";
+
+  paintPreview();
   show($("#ed-del"), qid !== "new");
   show($("#editor"), true);
   paintQuestions();
@@ -187,6 +219,13 @@ $("#ed-save").addEventListener("click", async () => {
 
   const data = { text };
   if ($("#ed-cat").value) data.cat = $("#ed-cat").value;
+  data.list = $("#ed-list").value === LISTS.DEMO ? LISTS.DEMO : LISTS.MAIN;
+
+  const exText = $("#ed-extext").value.trim();
+  const exImg  = $("#ed-eximg").value.trim();
+  if (exText) data.exText = exText;
+  if (exImg)  data.exImg  = exImg;
+
   for (const L of LETTERS) {
     const v = $("#ed-" + L.toLowerCase()).value.trim();
     if (v) data[L.toLowerCase()] = v;
@@ -197,7 +236,9 @@ $("#ed-save").addEventListener("click", async () => {
   if (!data[key.toLowerCase()]) { toast(`正解設為 ${key}，但選項 ${key} 是空的`); return; }
 
   const qid = editing === "new" ? newId("q") : editing;
-  data.order = editing === "new" ? toSortedList(questions).length : (questions[qid]?.order ?? 0);
+  data.order = editing === "new"
+    ? questionsOf(questions, data.list).length
+    : (questions[qid]?.order ?? 0);
 
   await set(ref(db, `${PATH.questions}/${qid}`), data);
   await set(ref(db, `${PATH.answerKey}/${qid}`), key);
@@ -212,6 +253,7 @@ $("#ed-del").addEventListener("click", async () => {
   await Promise.all([
     remove(ref(db, `${PATH.questions}/${qid}`)),
     remove(ref(db, `${PATH.answerKey}/${qid}`)),
+    remove(ref(db, `${PATH.repAnswers}/${qid}`)),
     remove(ref(db, `${PATH.responses}/${qid}`)),
     remove(ref(db, `${PATH.stats}/${qid}`)),
     remove(ref(db, `${PATH.state}/revealed/${qid}`))
@@ -223,21 +265,24 @@ $("#ed-del").addEventListener("click", async () => {
 // ============================================================
 //  批次貼上
 // ============================================================
+/** 匯入到目前選的題庫。replace 只清掉「這個題庫」的題目，另一個題庫不動。 */
 async function writeBulk(items, replace) {
   if (replace) {
-    await Promise.all([
-      remove(ref(db, PATH.questions)),
-      remove(ref(db, PATH.answerKey)),
-      remove(ref(db, PATH.responses)),
-      remove(ref(db, PATH.stats)),
-      remove(ref(db, `${PATH.state}/revealed`))
-    ]);
+    const doomed = questionsOf(questions, curList);
+    await Promise.all(doomed.flatMap(q => [
+      remove(ref(db, `${PATH.questions}/${q.id}`)),
+      remove(ref(db, `${PATH.answerKey}/${q.id}`)),
+      remove(ref(db, `${PATH.repAnswers}/${q.id}`)),
+      remove(ref(db, `${PATH.responses}/${q.id}`)),
+      remove(ref(db, `${PATH.stats}/${q.id}`)),
+      remove(ref(db, `${PATH.state}/revealed/${q.id}`))
+    ]));
   }
-  const base = replace ? 0 : toSortedList(questions).length;
+  const base = replace ? 0 : questionsOf(questions, curList).length;
   const qs = {}, ks = {};
   items.forEach(({ q, key }, i) => {
     const id = newId("q");
-    qs[id] = { ...q, order: base + i };
+    qs[id] = { ...q, list: curList, order: base + i };
     ks[id] = key;
   });
   await update(ref(db, PATH.questions), qs);
@@ -246,7 +291,7 @@ async function writeBulk(items, replace) {
 
 $("#bulk-append").addEventListener("click", () => runBulk(false));
 $("#bulk-replace").addEventListener("click", () => {
-  if (!confirm("會刪除現有全部題目與作答紀錄，確定嗎？")) return;
+  if (!confirm(`會刪除「${LIST_LABEL[curList]}」的全部題目與其作答紀錄（另一個題庫不受影響），確定嗎？`)) return;
   runBulk(true);
 });
 

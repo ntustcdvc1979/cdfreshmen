@@ -19,6 +19,11 @@
   .mini { padding:8px 12px; font-size:14px; }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   @media (max-width:520px){ .grid2 { grid-template-columns:1fr; } }
+  .qitem .meta { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .qitem .flag { font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px;
+                 background:rgba(53,168,255,.16); border:1px solid rgba(53,168,255,.45); color:var(--cyan-lt); }
+  .qitem .flag.warn { background:rgba(255,84,112,.14); border-color:var(--bad); color:#ffa5b4; }
+  .qitem .flag.ok   { background:rgba(47,217,107,.14); border-color:var(--ok); color:#7bffab; }
 </style>
 </head>
 <body>
@@ -66,6 +71,13 @@
         <strong class="title-gold" style="font-size:20px;">題目</strong>
         <span class="hint" id="q-count"></span>
       </div>
+      <div class="field">
+        <label for="sel-list">正在編輯哪個題庫</label>
+        <select id="sel-list">
+          <option value="main">正式題目</option>
+          <option value="demo">DEMO 練習題（不計分）</option>
+        </select>
+      </div>
       <div id="q-list" class="stack"></div>
       <button id="q-add" class="btn">＋ 新增一題</button>
     </div>
@@ -81,9 +93,39 @@
         <div class="field"><label for="ed-c">選項 C</label><input id="ed-c"></div>
         <div class="field"><label for="ed-d">選項 D</label><input id="ed-d"></div>
       </div>
-      <div class="field"><label for="ed-key">正確答案</label>
-        <select id="ed-key"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
+      <div class="grid2">
+        <div class="field"><label for="ed-key">正確答案</label>
+          <select id="ed-key"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
+        </div>
+        <div class="field"><label for="ed-list">題庫</label>
+          <select id="ed-list">
+            <option value="main">正式題目</option>
+            <option value="demo">DEMO 練習題（不計分）</option>
+          </select>
+        </div>
       </div>
+
+      <hr style="border:none; border-top:1px solid rgba(53,168,255,.3); margin:4px 0;">
+      <p class="hint" style="text-align:left; margin:0;">
+        <b style="color:var(--gold-lt)">公布答案後的說明</b>　主持人在投影幕上按 <b>→</b> 就會切到這一頁。
+      </p>
+      <div class="field">
+        <label for="ed-extext">說明文字</label>
+        <textarea id="ed-extext" style="min-height:110px;" placeholder="為什麼是這個答案、想讓新生帶走什麼觀念…（可留空）"></textarea>
+      </div>
+      <div class="field">
+        <label for="ed-eximg">說明圖片網址</label>
+        <input id="ed-eximg" placeholder="https://… 或 assets/img/explain/q1.png">
+      </div>
+      <p class="hint" style="text-align:left; margin:0;">
+        圖片有兩種放法：①貼一個外部圖片直連網址；
+        ②把圖片檔放進 repo 的 <code>assets/img/explain/</code> 資料夾，這裡填
+        <code>assets/img/explain/檔名.png</code>。留空就只顯示文字。
+      </p>
+      <div id="ed-preview" class="center hidden" style="margin:4px 0;">
+        <img id="ed-preview-img" alt="預覽" style="max-width:100%; max-height:220px; border-radius:10px; box-shadow:0 0 0 2px rgba(255,200,31,.35);">
+      </div>
+
       <div class="row">
         <button id="ed-save"   class="btn" style="flex:1 1 140px;">儲存</button>
         <button id="ed-cancel" class="btn ghost" style="flex:1 1 100px;">取消</button>
@@ -102,9 +144,12 @@
         例如：<code>大學必修學分不足會怎樣？|延畢|自動補修|不影響|退選|A|時間管理大師</code>
       </p>
       <textarea id="bulk-in" style="min-height:130px;" placeholder="每行一題…"></textarea>
+      <p class="hint" style="text-align:left; margin:0;">
+        會匯入到上面「正在編輯哪個題庫」選的那一個。說明文字與圖片要匯入後逐題編輯。
+      </p>
       <div class="row">
-        <button id="bulk-append"  class="btn ghost">附加到現有題目</button>
-        <button id="bulk-replace" class="btn danger">清空並取代全部題目</button>
+        <button id="bulk-append"  class="btn ghost">附加到目前題庫</button>
+        <button id="bulk-replace" class="btn danger">清空並取代目前題庫</button>
       </div>
     </div>
 

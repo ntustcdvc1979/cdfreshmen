@@ -1,16 +1,18 @@
 // ============================================================
 //  玩家端 —— 手機直式
+//  分兩種身分：上台代表（一組一位，決定最終答案）與台下組員。
 // ============================================================
 
 import {
-  db, ref, onValue, get, set, serverTimestamp,
-  PATH, PHASE, LETTERS, categoryOf, clientId, $, show, toast, toSortedList, escapeHtml
+  db, auth, ref, onValue, get, set, remove, serverTimestamp, ensureAnonAuth,
+  PATH, PHASE, ROLE, LETTERS, LISTS, DEFAULT_LIMIT_SEC,
+  categoryOf, listOf, questionsOf, tallyMembers, scoreOne, secondsLeft,
+  $, show, toast, toSortedList, escapeHtml
 } from "./common.js";
-
-const me = clientId();
 
 const scr = {
   group:    $("#scr-group"),
+  role:     $("#scr-role"),
   wait:     $("#scr-wait"),
   question: $("#scr-question"),
   reveal:   $("#scr-reveal"),
@@ -18,108 +20,197 @@ const scr = {
   error:    $("#scr-error")
 };
 
-let groups     = {};      // 組別
-let questions  = {};      // 題目（不含正解）
-let state      = null;    // 主持人的當前狀態
-let myGroup    = localStorage.getItem("cdf_group") || "";
-let renderedQid = null;   // 已經畫過的題目，避免重畫時閃爍
-let revealedQid = null;   // 目前正在公布的題目
-let keyUnsub   = null;    // /answerKey/{qid} 的監聽解除函式
-let statsUnsub = null;
-let lastStats  = null;    // /stats/{qid} 最新內容
+let uid       = null;
+let groups    = {};
+let questions = {};
+let state     = null;
+let reps      = {};      // /reps —— 哪些組已經有代表了
+let timeOffset = 0;      // 伺服器時鐘差
 
-/** 只顯示其中一個畫面 */
+let myGroup = localStorage.getItem("cdf_group") || "";
+let myRole  = localStorage.getItem("cdf_role")  || "";
+
+let renderedQid = null;
+let revealedQid = null;
+let pending     = null;   // 代表按了選項但還沒確認的字母
+
+// 組員自己的選擇存本機。/responses 組員讀不回來（規則只放行本組代表），
+// 所以重新整理後要靠這裡記得自己選了什麼。
+const myPick    = qid => localStorage.getItem("cdf_pick_" + qid) || null;
+const setMyPick = (qid, c) => localStorage.setItem("cdf_pick_" + qid, c);
+
+let repsLoaded = false;   // /reps 至少同步過一次，才能判斷代表位子有沒有被收回
+let unsubMembers = null;  // 代表監聽自己組的作答
+let unsubKey = null, unsubRepAns = null, unsubMyRepAns = null, unsubRevMembers = null;
+let memberTallyNow = { A:0, B:0, C:0, D:0, total:0 };
+let myRepAnswer = null;
+let tickTimer = null;
+
 function goto(name) {
   for (const [k, el] of Object.entries(scr)) show(el, k === name);
+  show($("#idbar"), !!(myGroup && myRole) && name !== "group" && name !== "role");
 }
-
-/** 我在這題選了什麼（存本機，因為 /responses 只有主持人讀得到） */
-const myPick = {
-  get: qid => localStorage.getItem("cdf_ans_" + qid) || null,
-  set: (qid, c) => localStorage.setItem("cdf_ans_" + qid, c)
-};
-
-// ------------------------------------------------------------
-//  組別
-// ------------------------------------------------------------
-const sel = $("#sel-group");
-const btnJoin = $("#btn-join");
-
-onValue(ref(db, PATH.groups), snap => {
-  groups = snap.val() || {};
-  const list = toSortedList(groups);
-
-  sel.innerHTML = list.length
-    ? '<option value="">— 請選擇 —</option>' +
-      list.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`).join("")
-    : '<option value="">（後台尚未建立組別）</option>';
-
-  if (myGroup && groups[myGroup]) sel.value = myGroup;
-  btnJoin.disabled = !sel.value;
-  paintGroupPill();
-}, err => fail(err));
-
-sel.addEventListener("change", () => { btnJoin.disabled = !sel.value; });
-
-btnJoin.addEventListener("click", () => {
-  if (!sel.value) return;
-  myGroup = sel.value;
-  localStorage.setItem("cdf_group", myGroup);
-  paintGroupPill();
-  render();
-});
-
-$("#btn-regroup").addEventListener("click", () => {
-  myGroup = "";
-  localStorage.removeItem("cdf_group");
-  goto("group");
-});
-
-function paintGroupPill() {
-  $("#wait-group").textContent = myGroup && groups[myGroup] ? "你的組別：" + groups[myGroup].name : "尚未選組";
-}
-
-// ------------------------------------------------------------
-//  題目 & 狀態
-// ------------------------------------------------------------
-onValue(ref(db, PATH.questions), snap => { questions = snap.val() || {}; render(); }, fail);
-onValue(ref(db, PATH.state),     snap => { state     = snap.val() || {};  render(); }, fail);
 
 function fail(err) {
   console.error(err);
-  $("#err-msg").textContent = "無法連上伺服器（" + (err?.code || err?.message || "unknown") + "）。請確認網路，或通知工作人員。";
+  $("#err-msg").textContent =
+    "無法連上伺服器（" + (err?.code || err?.message || "unknown") + "）。請確認網路，或通知工作人員。";
   goto("error");
 }
 
-/** 把類別標籤塗上該類別的顏色；沒設定類別的題目就整個藏起來 */
-function paintCatPill(el, q) {
-  const cat = categoryOf(q?.cat);
-  el.textContent = cat.name;
-  el.style.setProperty("--cat", cat.color);
-  el.parentElement.style.display = q?.cat ? "" : "none";
+// ------------------------------------------------------------
+//  啟動：先匿名登入，才有身分可以寫資料、代表才讀得到組員作答
+// ------------------------------------------------------------
+(async function boot() {
+  goto(myGroup && myRole ? "wait" : "group");
+  try {
+    const user = await ensureAnonAuth();
+    uid = user.uid;
+  } catch (e) {
+    if (e?.code === "auth/operation-not-allowed" || e?.code === "auth/admin-restricted-operation") {
+      $("#err-msg").textContent =
+        "Firebase 尚未啟用「匿名」登入方式。請到 Firebase 主控台 → Authentication → 登入方式 啟用匿名登入。";
+    } else {
+      $("#err-msg").textContent = "無法建立連線（" + (e?.code || e?.message) + "）。";
+    }
+    goto("error");
+    return;
+  }
+  attach();
+})();
+
+function attach() {
+  onValue(ref(db, "/.info/serverTimeOffset"), s => { timeOffset = s.val() || 0; });
+  onValue(ref(db, PATH.groups),    s => { groups    = s.val() || {}; paintGroupSelect(); render(); }, fail);
+  onValue(ref(db, PATH.questions), s => { questions = s.val() || {}; render(); }, fail);
+  onValue(ref(db, PATH.reps),      s => { reps = s.val() || {}; repsLoaded = true; paintRolePicker(); render(); }, fail);
+  onValue(ref(db, PATH.state),     s => { state     = s.val() || {}; render(); }, fail);
 }
 
-/** 題目在整份題庫中的序號（第幾題） */
+// ------------------------------------------------------------
+//  第一步：選組別
+// ------------------------------------------------------------
+const selGroup = $("#sel-group");
+
+function paintGroupSelect() {
+  const list = toSortedList(groups);
+  selGroup.innerHTML = list.length
+    ? '<option value="">— 請選擇 —</option>' +
+      list.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`).join("")
+    : '<option value="">（後台尚未建立組別）</option>';
+  if (myGroup && groups[myGroup]) selGroup.value = myGroup;
+  $("#btn-group-next").disabled = !selGroup.value;
+}
+
+selGroup.addEventListener("change", () => { $("#btn-group-next").disabled = !selGroup.value; });
+
+$("#btn-group-next").addEventListener("click", () => {
+  if (!selGroup.value) return;
+  myGroup = selGroup.value;
+  localStorage.setItem("cdf_group", myGroup);
+  $("#role-group").textContent = groups[myGroup]?.name || "";
+  paintRolePicker();
+  goto("role");
+});
+
+$("#btn-role-back").addEventListener("click", () => goto("group"));
+
+$("#btn-leave").addEventListener("click", async () => {
+  if (!confirm("要重新選擇組別與身分嗎？")) return;
+  // 自己是代表就把位子讓出來
+  if (myRole === ROLE.REP && reps[myGroup]?.uid === uid) {
+    try { await remove(ref(db, `${PATH.reps}/${myGroup}`)); } catch {}
+  }
+  myRole = "";
+  localStorage.removeItem("cdf_role");
+  goto("group");
+});
+
+// ------------------------------------------------------------
+//  第二步：選身分
+// ------------------------------------------------------------
+function repTakenByOther() {
+  const r = reps[myGroup];
+  return !!r?.uid && r.uid !== uid;
+}
+
+function paintRolePicker() {
+  if (!myGroup) return;
+  $("#role-group").textContent = groups[myGroup]?.name || "";
+  const taken = repTakenByOther();
+  $("#pick-rep").classList.toggle("disabled", taken);
+  $("#rep-taken").textContent = taken ? "⚠ 這組已經有代表了" : "";
+}
+
+$("#pick-rep").addEventListener("click", async () => {
+  if (repTakenByOther()) { toast("這組已經有代表了"); return; }
+  try {
+    await set(ref(db, `${PATH.reps}/${myGroup}`), { uid, at: serverTimestamp() });
+    myRole = ROLE.REP;
+    localStorage.setItem("cdf_role", myRole);
+    render();
+  } catch (e) {
+    console.error(e);
+    toast("搶不到代表位置，可能剛好有人先按了");
+  }
+});
+
+$("#pick-member").addEventListener("click", async () => {
+  // 原本是代表又改當組員，就把位子還回去
+  if (reps[myGroup]?.uid === uid) {
+    try { await remove(ref(db, `${PATH.reps}/${myGroup}`)); } catch {}
+  }
+  myRole = ROLE.MEMBER;
+  localStorage.setItem("cdf_role", myRole);
+  render();
+});
+
+// ------------------------------------------------------------
+//  主畫面切換
+// ------------------------------------------------------------
+const isRep = () => myRole === ROLE.REP;
+
+function paintIdBar() {
+  $("#id-group").textContent = groups[myGroup]?.name || "—";
+  const r = $("#id-role");
+  r.textContent = isRep() ? "🎤 上台代表" : "📱 台下組員";
+  r.className = isRep() ? "pill live" : "pill";
+}
+
+/** 題目在「當前題庫」中的序號 */
 function questionNo(qid) {
-  const list = toSortedList(questions);
+  const list = questionsOf(questions, state?.list || LISTS.MAIN);
   const i = list.findIndex(q => q.id === qid);
   return i < 0 ? "?" : i + 1;
 }
 
 function render() {
-  if (!state) return;                      // 還沒拿到狀態
+  if (!state || !uid) return;
   if (!myGroup || !groups[myGroup]) { goto("group"); return; }
+  if (!myRole) { paintRolePicker(); goto("role"); return; }
+
+  // 代表位置被主持人釋放、或被別人接手 → 退回選身分
+  // （要等 /reps 同步過一次才判斷，否則剛載入時會被自己誤踢）
+  if (isRep() && repsLoaded && reps[myGroup]?.uid !== uid) {
+    myRole = "";
+    localStorage.removeItem("cdf_role");
+    toast("你的代表身分已被取消，請重新選擇");
+    paintRolePicker();
+    goto("role");
+    return;
+  }
+
+  paintIdBar();
 
   const phase = state.phase || PHASE.IDLE;
   const qid   = state.qid || null;
   const q     = qid ? questions[qid] : null;
 
   if (phase !== PHASE.REVEAL || qid !== revealedQid) detachReveal();
+  if (phase !== PHASE.OPEN && phase !== PHASE.LOCKED) detachLive();
 
   if (phase === PHASE.FINAL) { renderFinal(); return; }
-
   if ((phase === PHASE.OPEN || phase === PHASE.LOCKED) && q) { renderQuestion(qid, q, phase); return; }
-
   if (phase === PHASE.REVEAL && q) { renderReveal(qid, q); return; }
 
   $("#wait-msg").textContent = phase === PHASE.IDLE
@@ -131,11 +222,20 @@ function render() {
 // ------------------------------------------------------------
 //  作答畫面
 // ------------------------------------------------------------
+function detachLive() {
+  if (unsubMembers)  { unsubMembers();  unsubMembers = null; }
+  if (unsubMyRepAns) { unsubMyRepAns(); unsubMyRepAns = null; }
+  if (tickTimer)     { clearInterval(tickTimer); tickTimer = null; }
+  memberTallyNow = { A:0, B:0, C:0, D:0, total:0 };
+  myRepAnswer = null;
+}
+
 function renderQuestion(qid, q, phase) {
   const locked = phase === PHASE.LOCKED;
 
   if (renderedQid !== qid) {
     renderedQid = qid;
+    pending = null;
     $("#q-no").textContent   = questionNo(qid);
     $("#q-text").textContent = q.text || "";
     paintCatPill($("#q-cat"), q);
@@ -149,37 +249,97 @@ function renderQuestion(qid, q, phase) {
       btn.className = "opt";
       btn.dataset.letter = L;
       btn.innerHTML = `<span class="letter">${L}</span><span class="label">${escapeHtml(label)}</span>`;
-      btn.addEventListener("click", () => submit(qid, L));
+      btn.addEventListener("click", () => pick(qid, L));
       box.appendChild(btn);
     }
+
+    detachLive();
+
+    if (isRep()) {
+      // 代表：看自己這一組的即時選擇比例（規則只放行「你是這組代表」）
+      unsubMembers = onValue(ref(db, `${PATH.responses}/${qid}/${myGroup}`), s => {
+        memberTallyNow = tallyMembers(s.val());
+        paintRepPanel(q);
+      }, () => { /* 沒權限或還沒人作答 */ });
+
+      unsubMyRepAns = onValue(ref(db, `${PATH.repAnswers}/${qid}/${myGroup}`), s => {
+        myRepAnswer = s.val();
+        paintButtons(qid, locked);
+      }, () => {});
+    }
+
+    startCountdown();
   }
 
-  const picked = myPick.get(qid);
-  for (const btn of $("#opts").children) {
-    btn.classList.toggle("picked", btn.dataset.letter === picked);
-    btn.disabled = locked;
-  }
+  show($("#rep-panel"),       isRep());
+  show($("#rep-confirm-box"), isRep() && !locked);
+  paintRepPanel(q);
+  paintButtons(qid, locked);
 
   show($("#tag-open"), !locked);
   show($("#tag-lock"), locked);
-  $("#q-hint").textContent = locked
-    ? (picked ? `已截止，你的答案是 ${picked}。等待主持人公布…` : "已截止作答，這題沒有送出答案。")
-    : (picked ? `已送出 ${picked}，截止前都可以改。` : "選好之後就送出，主持人公布前答案不會顯示。");
 
   goto("question");
 }
 
-async function submit(qid, letter) {
-  if ((state?.phase || "") !== PHASE.OPEN || state?.qid !== qid) {
-    toast("已截止作答");
+function paintButtons(qid, locked) {
+  const confirmedLetter = myRepAnswer?.c || null;
+  const mine = isRep() ? (confirmedLetter || pending) : myPick(qid);
+
+  for (const btn of $("#opts").children) {
+    const L = btn.dataset.letter;
+    btn.classList.toggle("picked", L === mine);
+    btn.classList.toggle("confirmed", !!confirmedLetter && L === confirmedLetter);
+    btn.disabled = locked || !!confirmedLetter;
+  }
+
+  if (isRep()) {
+    const b = $("#btn-confirm");
+    b.disabled = locked || !!confirmedLetter || !pending;
+    b.innerHTML = confirmedLetter
+      ? `已送出 <b>${confirmedLetter}</b>`
+      : `確認送出 <b>${pending || "—"}</b>`;
+    $("#q-hint").textContent = confirmedLetter
+      ? `已送出 ${confirmedLetter}，等待主持人公布答案。`
+      : locked ? "已截止作答。"
+      : "先看組員的比例，再選一個選項並按確認送出。";
+  } else {
+    $("#q-hint").textContent = locked
+      ? (mine ? `已截止，你選的是 ${mine}。` : "已截止作答，這題你沒有作答。")
+      : (mine ? `已送出 ${mine}，截止前都可以改。你的選擇會即時傳給代表。` : "選出你認為的答案，代表看得到全組的比例。");
+  }
+}
+
+function paintRepPanel(q) {
+  if (!isRep()) return;
+  const t = memberTallyNow;
+  $("#rep-count").textContent = t.total + " 人已選";
+  $("#rep-bars").innerHTML = LETTERS
+    .filter(L => q[L.toLowerCase()])
+    .map(L => {
+      const n = t[L], pct = t.total ? Math.round(n / t.total * 100) : 0;
+      return `<div class="bar-row">
+        <span class="bar-key">${L}</span>
+        <span class="bar-track"><span class="bar-fill" style="width:${pct}%"></span></span>
+        <span class="bar-num">${pct}%（${n}）</span>
+      </div>`;
+    }).join("");
+}
+
+async function pick(qid, letter) {
+  if ((state?.phase || "") !== PHASE.OPEN || state?.qid !== qid) { toast("已截止作答"); return; }
+
+  if (isRep()) {
+    if (myRepAnswer?.c) { toast("已經送出，不能更改"); return; }
+    pending = letter;                    // 代表只是先選，要按確認才算
+    paintButtons(qid, false);
     return;
   }
+
   try {
-    await set(ref(db, `${PATH.responses}/${qid}/${me}`), {
-      g: myGroup, c: letter, t: serverTimestamp()
-    });
-    myPick.set(qid, letter);
-    render();
+    await set(ref(db, `${PATH.responses}/${qid}/${myGroup}/${uid}`), { c: letter, t: serverTimestamp() });
+    setMyPick(qid, letter);
+    paintButtons(qid, false);
     toast("已送出 " + letter);
   } catch (e) {
     console.error(e);
@@ -187,59 +347,114 @@ async function submit(qid, letter) {
   }
 }
 
+$("#btn-confirm").addEventListener("click", async () => {
+  const qid = state?.qid;
+  if (!isRep() || !qid || !pending) return;
+  if (myRepAnswer?.c) { toast("已經送出了"); return; }
+  if (state?.phase !== PHASE.OPEN) { toast("已截止作答"); return; }
+  if (!confirm(`確定送出 ${pending}？送出後就不能更改，並且會顯示在投影幕上。`)) return;
+
+  try {
+    await set(ref(db, `${PATH.repAnswers}/${qid}/${myGroup}`), {
+      c: pending, uid, t: serverTimestamp()
+    });
+    toast("已送出 " + pending);
+  } catch (e) {
+    console.error(e);
+    toast("送出失敗：可能已截止或你不是這組代表");
+  }
+});
+
+// ---------- 倒數 ----------
+function startCountdown() {
+  if (tickTimer) clearInterval(tickTimer);
+  const paint = () => {
+    const left = secondsLeft(state?.openedAt, state?.limitSec || DEFAULT_LIMIT_SEC, timeOffset);
+    const el = $("#q-timer");
+    if (left === null || state?.phase !== PHASE.OPEN) {
+      el.textContent = state?.phase === PHASE.LOCKED ? "0" : "–";
+      el.className = "timer";
+      return;
+    }
+    el.textContent = left;
+    el.className = "timer" + (left <= 5 ? " danger" : left <= 10 ? " warn" : "");
+  };
+  paint();
+  tickTimer = setInterval(paint, 250);
+}
+
 // ------------------------------------------------------------
 //  公布答案
 // ------------------------------------------------------------
+function paintCatPill(el, q) {
+  const cat = categoryOf(q?.cat);
+  el.textContent = cat.name;
+  el.style.setProperty("--cat", cat.color);
+  el.parentElement.style.display = q?.cat ? "" : "none";
+}
+
 function detachReveal() {
-  if (keyUnsub)   { keyUnsub();   keyUnsub = null; }
-  if (statsUnsub) { statsUnsub(); statsUnsub = null; }
+  if (unsubKey)        { unsubKey();        unsubKey = null; }
+  if (unsubRepAns)     { unsubRepAns();     unsubRepAns = null; }
+  if (unsubRevMembers) { unsubRevMembers(); unsubRevMembers = null; }
   revealedQid = null;
-  lastStats = null;
 }
 
 function renderReveal(qid, q) {
   goto("reveal");
-  if (revealedQid === qid) return;   // 已經在公布這一題，不要重跑動畫
+  if (revealedQid === qid) return;
   revealedQid = qid;
+
   $("#r-no").textContent = questionNo(qid);
   paintCatPill($("#r-cat"), q);
 
-  // 正解：資料庫規則規定「已公布」才讀得到，所以現在才掛監聽
-  keyUnsub = onValue(ref(db, `${PATH.answerKey}/${qid}`), snap => {
-    const key    = snap.val();
-    const picked = myPick.get(qid);
+  let key = null, repAns = null, members = null;
+
+  const repaint = () => {
     $("#r-letter").textContent = key || "—";
 
+    const s = scoreOne(key, repAns, members);
     const v = $("#r-verdict");
-    if (!picked)          { v.className = "verdict";     v.textContent = "這題你沒有作答"; }
-    else if (picked === key){ v.className = "verdict ok";  v.textContent = `答對了！你選 ${picked}`; }
-    else                  { v.className = "verdict bad"; v.textContent = `可惜，你選了 ${picked}`; }
+    if (!repAns)          { v.className = "verdict";     v.textContent = "你們這組代表沒有作答"; }
+    else if (s.repOk)     { v.className = "verdict ok";  v.textContent = `代表答對了！選 ${s.repChoice}`; }
+    else                  { v.className = "verdict bad"; v.textContent = `代表選了 ${s.repChoice}`; }
 
-    paintBars(key, q);
-  }, () => { /* 尚未開放讀取，等主持人公布 */ });
+    $("#r-points").textContent = `本題 +${s.points} 分`;
 
-  statsUnsub = onValue(ref(db, `${PATH.stats}/${qid}`), snap => {
-    lastStats = snap.val();
-    paintBars(null, q);
-  }, () => {});
-}
+    const t = s.memberTally;
+    $("#r-bars").innerHTML = LETTERS
+      .filter(L => q[L.toLowerCase()])
+      .map(L => {
+        const n = t[L], pct = t.total ? Math.round(n / t.total * 100) : 0;
+        return `<div class="bar-row">
+          <span class="bar-key">${L}</span>
+          <span class="bar-track"><span class="bar-fill${L === key ? " is-correct" : ""}" style="width:${pct}%"></span></span>
+          <span class="bar-num">${pct}%（${n}）</span>
+        </div>`;
+      }).join("");
 
-function paintBars(keyMaybe, q) {
-  const key   = keyMaybe ?? lastStats?.key ?? null;
-  const stats = lastStats;
-  const total = stats?.total || 0;
+    $("#r-detail").innerHTML = [
+      `代表：${s.repChoice || "未作答"} ${s.repOk ? "✅ +1" : "❌"}`,
+      s.memberRate === null
+        ? "組員：沒有人作答"
+        : `組員答對率：${s.memberRate}%（${s.memberCorrect}/${t.total}）${s.memberOk ? "✅ 過半 +1" : "❌ 未過半"}`
+    ].join("<br>");
+  };
 
-  $("#r-bars").innerHTML = LETTERS
-    .filter(L => q[L.toLowerCase()])
-    .map(L => {
-      const n   = stats?.[L] || 0;
-      const pct = total ? Math.round(n / total * 100) : 0;
-      return `<div class="bar-row">
-        <span class="bar-key">${L}</span>
-        <span class="bar-track"><span class="bar-fill${L === key ? " is-correct" : ""}" style="width:${pct}%"></span></span>
-        <span class="bar-num">${n} 人 ${pct}%</span>
-      </div>`;
-    }).join("");
+  repaint();
+
+  // 正解：安全性規則規定「已公布」才讀得到
+  unsubKey = onValue(ref(db, `${PATH.answerKey}/${qid}`), s => { key = s.val(); repaint(); }, () => {});
+  unsubRepAns = onValue(ref(db, `${PATH.repAnswers}/${qid}/${myGroup}`), s => { repAns = s.val(); repaint(); }, () => {});
+  // 組員分布：代表讀得到即時資料；組員讀不到，就只顯示自己的部分
+  if (isRep()) {
+    unsubRevMembers = onValue(ref(db, `${PATH.responses}/${qid}/${myGroup}`),
+      s => { members = s.val(); repaint(); }, () => {});
+  } else {
+    const mine = myPick(qid);
+    members = mine ? { [uid]: { c: mine } } : null;
+    repaint();
+  }
 }
 
 // ------------------------------------------------------------
@@ -254,27 +469,24 @@ async function renderFinal() {
       ? rows.map((r, i) => `<tr class="${i === 0 ? "top1" : ""}">
           <td>${i === 0 ? "🏆" : i + 1}</td>
           <td>${escapeHtml(r.name)}${r.gid === myGroup ? " ←" : ""}</td>
-          <td class="n">${r.rate}%</td>
-          <td class="n">${r.correct}/${r.answered}</td>
+          <td class="n">${r.points}</td>
+          <td class="n">${r.repCorrect}</td>
+          <td class="n">${r.memberBonus}</td>
         </tr>`).join("")
-      : `<tr><td colspan="4" style="color:#a9bce8;">主持人尚未產生排行榜</td></tr>`;
+      : `<tr><td colspan="5" style="color:#a9bce8;">主持人尚未產生排行榜</td></tr>`;
 
-    // 自己這一組最強的類別
     const mine = rows.find(r => r.gid === myGroup);
     if (mine?.bestCat) {
       const cat = categoryOf(mine.bestCat);
       $("#final-cat").textContent = cat.name;
       $("#final-cat").style.setProperty("--cat", cat.color);
-      $("#final-cat-note").textContent = `這個項目答對率 ${mine.bestCatRate}%`;
+      $("#final-cat-note").textContent = `這個項目拿到 ${mine.bestCatPoints} / ${mine.bestCatMax} 分`;
       show($("#final-mine"), true);
     } else {
       show($("#final-mine"), false);
     }
   } catch {
-    $("#final-rows").innerHTML = `<tr><td colspan="4" style="color:#a9bce8;">讀取排行榜失敗</td></tr>`;
+    $("#final-rows").innerHTML = `<tr><td colspan="5" style="color:#a9bce8;">讀取排行榜失敗</td></tr>`;
     show($("#final-mine"), false);
   }
 }
-
-// 一開始先顯示選組別，避免白畫面
-goto(myGroup ? "wait" : "group");
