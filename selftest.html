@@ -34,7 +34,7 @@ const repAnswers = {
   q4:{ g1:{c:"A"}, g2:{c:"A"}, g3:{c:"A"} },       // 未公布，不算
   q5:{ g1:{c:"A"}                        }         // DEMO，不算
 };
-// 台下組員（/responses/{qid}/{gid}/{uid}）
+// 台下學員（/responses/{qid}/{gid}/{uid}）
 const responses = {
   q1:{ g1:{u1:{c:"A"},u2:{c:"A"},u3:{c:"B"}},      // 2/3 = 67% ≥50% ✔
        g2:{u4:{c:"A"},u5:{c:"B"}},                  // 1/2 = 50% ≥50% ✔（剛好過半要算）
@@ -47,19 +47,19 @@ const responses = {
 
 // ════════ 1. 單題計分 ════════
 let s = scoreOne("A", {c:"A"}, {u1:{c:"A"},u2:{c:"B"}});
-ok("代表對 + 組員剛好 50% → 2 分", s.points === 2 && s.repOk && s.memberOk, JSON.stringify({r:s.memberRate,p:s.points}));
+ok("代表對 + 學員剛好 50% → 2 分", s.points === 2 && s.repOk && s.memberOk, JSON.stringify({r:s.memberRate,p:s.points}));
 
 s = scoreOne("A", {c:"B"}, {u1:{c:"A"},u2:{c:"A"},u3:{c:"B"}});
-ok("代表錯 + 組員 67% → 1 分", s.points === 1 && !s.repOk && s.memberOk, "rate=" + s.memberRate);
+ok("代表錯 + 學員 67% → 1 分", s.points === 1 && !s.repOk && s.memberOk, "rate=" + s.memberRate);
 
 s = scoreOne("A", {c:"A"}, {u1:{c:"B"},u2:{c:"B"},u3:{c:"A"}});
-ok("代表對 + 組員 33% → 1 分", s.points === 1 && s.repOk && !s.memberOk, "rate=" + s.memberRate);
+ok("代表對 + 學員 33% → 1 分", s.points === 1 && s.repOk && !s.memberOk, "rate=" + s.memberRate);
 
 s = scoreOne("A", null, null);
-ok("代表沒答 + 沒組員 → 0 分", s.points === 0 && s.repChoice === null && s.memberRate === null);
+ok("代表沒答 + 沒學員 → 0 分", s.points === 0 && s.repChoice === null && s.memberRate === null);
 
 s = scoreOne("A", {c:"A"}, null);
-ok("組員一個都沒答不給加分", s.points === 1 && s.memberOk === false, "rate=" + JSON.stringify(s.memberRate));
+ok("學員一個都沒答不給加分", s.points === 1 && s.memberOk === false, "rate=" + JSON.stringify(s.memberRate));
 
 s = scoreOne("A", {c:"X"}, {u1:{c:"?"}});
 ok("非法字母一律忽略", s.repChoice === null && s.memberTally.total === 0);
@@ -76,7 +76,7 @@ const by = Object.fromEntries(board.rows.map(r => [r.gid, r]));
 ok("只算已公布的正式題 → 3 題", board.questionCount === 3);
 ok("滿分 = 題數 × 2", by.g1.max === 6);
 
-//  g1：q1 代表✔+組員✔=2、q2 代表✔+組員✘=1、q3 代表✘+組員無=0  → 3
+//  g1：q1 代表✔+學員✔=2、q2 代表✔+學員✘=1、q3 代表✘+學員無=0  → 3
 ok("g1 = 3 分", by.g1.points === 3, JSON.stringify({p:by.g1.points, rep:by.g1.repCorrect, mem:by.g1.memberBonus}));
 //  g2：q1 ✔+✔=2、q2 ✘+無=0、q3 ✔+✔=2  → 4
 ok("g2 = 4 分", by.g2.points === 4, JSON.stringify({p:by.g2.points, rep:by.g2.repCorrect, mem:by.g2.memberBonus}));
@@ -84,7 +84,7 @@ ok("g2 = 4 分", by.g2.points === 4, JSON.stringify({p:by.g2.points, rep:by.g2.r
 ok("g3 = 1 分", by.g3.points === 1, JSON.stringify({p:by.g3.points, rep:by.g3.repCorrect, mem:by.g3.memberBonus}));
 
 ok("代表答對次數",   by.g1.repCorrect === 2 && by.g2.repCorrect === 2 && by.g3.repCorrect === 1);
-ok("組員過半次數",   by.g1.memberBonus === 1 && by.g2.memberBonus === 2 && by.g3.memberBonus === 0);
+ok("學員過半次數",   by.g1.memberBonus === 1 && by.g2.memberBonus === 2 && by.g3.memberBonus === 0);
 ok("代表作答題數（g3 少一題）", by.g3.repAnswered === 2, String(by.g3.repAnswered));
 ok("排序：g2 > g1 > g3", board.rows.map(r => r.gid).join(",") === "g2,g1,g3", board.rows.map(r=>r.gid+":"+r.points).join(" "));
 

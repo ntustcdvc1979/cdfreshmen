@@ -155,21 +155,39 @@
 
   .cellbox .mark { position: absolute; top: .5vh; right: .7vw; font-size: 1.9vh; }
 
-  /* ---------- 公布答案 ---------- */
+  /* ---------- 公布答案（答案與說明同時出現） ---------- */
   .huge-letter { font-size: 26vh; }
 
-  /* ---------- 說明頁 ---------- */
-  .explain { display: flex; gap: 2.5vw; align-items: stretch; min-height: 0; flex: 1 1 auto; }
+  .reveal-top {
+    display: flex; gap: 2vw; align-items: stretch;
+    flex: 1 1 auto; min-height: 0;
+  }
+  .reveal-ans {
+    flex: 0 0 20%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .reveal-ans .reveal-letter { font-size: 17vh; }
+  .reveal-ex {
+    flex: 1 1 auto; min-width: 0;
+    display: flex; flex-direction: column;
+    border-left: .28vh solid rgba(255,200,31,.35);
+    padding-left: 2vw;
+  }
+
+  /* ---------- 說明 ---------- */
+  .explain { display: flex; gap: 2vw; align-items: stretch; min-height: 0; flex: 1 1 auto; }
   .explain .txt {
-    flex: 1 1 auto; min-width: 0; overflow: auto;
-    font-size: var(--ex-fs, 2.6vh); line-height: 1.62; color: #e6eeff;
+    flex: 1 1 auto; min-width: 0; overflow: hidden;
+    font-size: var(--ex-fs, 2.4vh); line-height: 1.55; color: #e6eeff;
     white-space: pre-wrap;
   }
-  .explain .pic { flex: 0 0 42%; display: grid; place-items: center; min-width: 0; }
-  .explain .pic img { max-width: 100%; max-height: 62vh; border-radius: 1.2vh;
-    box-shadow: 0 0 0 .3vh rgba(255,200,31,.4), 0 2vh 5vh rgba(0,0,0,.6); }
+  .explain .pic { flex: 0 0 38%; display: grid; place-items: center; min-width: 0; }
+  .explain .pic img {
+    max-width: 100%; max-height: 100%; object-fit: contain;
+    border-radius: 1.2vh;
+    box-shadow: 0 0 0 .3vh rgba(255,200,31,.4), 0 1.4vh 4vh rgba(0,0,0,.6);
+  }
   .explain.noimg .pic { display: none; }
-  .explain.noimg .txt { text-align: center; }
 
   /* ---------- 統計條 ---------- */
   .screen-bars { display: grid; gap: 1.3vh; }
@@ -210,7 +228,6 @@
   <div class="top">
     <img class="logo" src="assets/img/logo.png" alt="大學星攻略">
     <span class="cat-pill" id="s-cat" style="font-size:2.1vh; padding:.7vh 1.4vw;">—</span>
-    <span class="pill" id="s-list" style="font-size:1.8vh;">正式題目</span>
     <span class="qbadge" id="s-badge">第 <b>–</b> 題</span>
   </div>
 

@@ -23,8 +23,8 @@ export {
 };
 
 /**
- * 學生端用匿名登入。
- * 需要它是因為：代表要讀「自己這一組」的組員作答比例，而安全性規則必須認得出
+ * 學員端用匿名登入。
+ * 需要它是因為：代表要讀「自己這一組」的學員作答比例，而安全性規則必須認得出
  * 「你就是這組的代表」才能放行；沒有身分就只能把所有人的作答全部公開。
  * 同時也用來確保一組只有一位代表、以及沒有人能改別人的答案。
  *
@@ -98,7 +98,7 @@ export function authErrorText(e) {
 //                                     gridCols, showRepLetters, revealed:{qid:true} }
 //  /reps/{gid}                    = { uid, at }                      ← 該組代表（一組一位）
 //  /repAnswers/{qid}/{gid}        = { c, uid, t }                     ← 代表按下確認後的答案
-//  /responses/{qid}/{gid}/{uid}   = { c, t }                          ← 台下組員的作答
+//  /responses/{qid}/{gid}/{uid}   = { c, t }                          ← 台下學員的作答
 //  /stats/{qid}                   = { A,B,C,D,total,key, rep:{…} }    ← 公布時由主持人寫入
 //  /leaderboard                   = { updatedAt, rows:[…] }
 export const PATH = {
@@ -132,7 +132,7 @@ export const LIST_LABEL = { main: "正式題目", demo: "DEMO 練習題" };
 /** 進場時選的身分 */
 export const ROLE = {
   REP:    "rep",      // 上台答題的代表，一組一位
-  MEMBER: "member"    // 台下組員
+  MEMBER: "member"    // 台下學員
 };
 
 export const LETTERS = ["A", "B", "C", "D"];
@@ -269,7 +269,7 @@ export function questionsOf(questions, list) {
 //
 //  每題每組最多 2 分：
 //    代表答對                        → +1
-//    台下組員答對率 >= 50%           → +1
+//    台下學員答對率 >= 50%           → +1
 //  排行榜就比總分。DEMO 題庫不計分。
 
 export const MEMBER_PASS_RATE = 0.5;
@@ -286,12 +286,12 @@ export function tally(entries) {
   return out;
 }
 
-/** 台下組員的作答分布：/responses/{qid}/{gid} → {A,B,C,D,total} */
+/** 台下學員的作答分布：/responses/{qid}/{gid} → {A,B,C,D,total} */
 export function tallyMembers(byGroup) {
   return tally(Object.values(byGroup || {}));
 }
 
-/** 全場所有組別加總的組員分布，用於公布時的整場統計 */
+/** 全場所有組別加總的學員分布，用於公布時的整場統計 */
 export function tallyAllMembers(byQuestion) {
   const all = [];
   for (const g of Object.values(byQuestion || {})) all.push(...Object.values(g || {}));

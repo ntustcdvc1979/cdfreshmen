@@ -84,7 +84,7 @@ function paintGroups() {
       <button class="btn ghost mini g-up">↑</button>
       <button class="btn ghost mini g-down">↓</button>
       <button class="btn danger mini g-del">刪除</button>
-    </div>`).join("") || `<p class="hint" style="text-align:left;">尚未建立任何組別。學生會看不到可選的組別。</p>`;
+    </div>`).join("") || `<p class="hint" style="text-align:left;">尚未建立任何組別。學員會看不到可選的組別。</p>`;
 }
 
 $("#g-list").addEventListener("click", async e => {
@@ -95,7 +95,7 @@ $("#g-list").addEventListener("click", async e => {
   const i    = list.findIndex(g => g.id === gid);
 
   if (e.target.classList.contains("g-del")) {
-    if (!confirm(`刪除「${groups[gid].name}」？已選這組的學生會被要求重選。`)) return;
+    if (!confirm(`刪除「${groups[gid].name}」？已選這組的學員會被要求重選。`)) return;
     await remove(ref(db, `${PATH.groups}/${gid}`));
   } else if (e.target.classList.contains("g-up") && i > 0) {
     await swapOrder(PATH.groups, list[i], list[i - 1]);

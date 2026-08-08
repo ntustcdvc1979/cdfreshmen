@@ -177,7 +177,7 @@ async function doReveal() {
   toast("已公布答案：" + key);
 }
 
-/** 結束：算出排行榜寫進 /leaderboard，學生端就能看到 */
+/** 結束：算出排行榜寫進 /leaderboard，學員端就能看到 */
 async function doFinal() {
   if (!confirm("要結束遊戲並公布最終排行榜嗎？")) return;
 
@@ -186,7 +186,7 @@ async function doFinal() {
 
   const rows = board.rows.map(r => {
     const b = best.get(r.gid);
-    const { byCat, ...rest } = r;      // byCat 不用送到學生端
+    const { byCat, ...rest } = r;      // byCat 不用送到學員端
     return b?.cat
       ? { ...rest, bestCat: b.cat.id, bestCatPoints: b.cell.points, bestCatMax: b.cell.max }
       : rest;
@@ -200,7 +200,7 @@ async function doFinal() {
 $("#btn-clear-q").addEventListener("click", async () => {
   const qid = curQid;
   if (!qid) return;
-  if (!confirm(`清除第 ${qIndex(qid) + 1} 題的所有作答（代表答案＋組員作答），讓這題可以重來？`)) return;
+  if (!confirm(`清除第 ${qIndex(qid) + 1} 題的所有作答（代表答案＋學員作答），讓這題可以重來？`)) return;
   await Promise.all([
     remove(ref(db, `${PATH.repAnswers}/${qid}`)),
     remove(ref(db, `${PATH.responses}/${qid}`)),
@@ -274,7 +274,7 @@ function paint() {
   const gl  = toSortedList(groups);
   const rt  = tallyReps(repAns[qid]);
   const mt  = tallyAllMembers(allResp[qid]);
-  $("#live-count").textContent = `代表 ${rt.total}/${gl.length} 組已確認　組員 ${mt.total} 人已選`;
+  $("#live-count").textContent = `代表 ${rt.total}/${gl.length} 組已確認　學員 ${mt.total} 人已選`;
 
   $("#live-repbars").innerHTML = bars(q, rt, key, gl.length);
   $("#live-membars").innerHTML = bars(q, mt, key, mt.total);
@@ -287,7 +287,7 @@ function paint() {
         return `<tr class="${i === 0 && r.points ? "top1" : ""}">
           <td>${i + 1}</td>
           <td>${escapeHtml(r.name)}</td>
-          <td class="n">${r.points}<small style="opacity:.5"> / ${r.max}</small></td>
+          <td class="n">${r.points}</td>
           <td class="n">${r.repCorrect}</td>
           <td class="n">${r.memberBonus}</td>
           <td class="n">${s.repChoice || "–"}<small style="opacity:.6"> ${s.memberTally.total}人</small></td>
@@ -407,7 +407,7 @@ $("#btn-qr").addEventListener("click", async () => {
     qr.make();
     $("#qr-img").src = qr.createDataURL(8, 4);
   } catch {
-    $("#qr-url").textContent = "（QR 產生器載入失敗，請直接把網址給學生）\n" + playerUrl;
+    $("#qr-url").textContent = "（QR 產生器載入失敗，請直接把網址給學員）\n" + playerUrl;
   }
 });
 $("#btn-qr-close").addEventListener("click", () => show($("#qr-box"), false));

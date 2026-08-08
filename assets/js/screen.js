@@ -6,7 +6,7 @@
 
 import {
   db, auth, ref, onValue, onAuthStateChanged,
-  PATH, PHASE, LISTS, LIST_LABEL, LETTERS, DEFAULT_LIMIT_SEC,
+  PATH, PHASE, LISTS, LETTERS, DEFAULT_LIMIT_SEC,
   categoryOf, questionsOf, tallyAllMembers, secondsLeft, isHost,
   gridColumns, buildScoreboard, categoryMatrix, groupBestCategories, columnWinners,
   $, show, escapeHtml, toSortedList
@@ -90,11 +90,11 @@ function onStateChange() {
   if (!changed) return;
 
   if (phase === PHASE.OPEN) {
-    snd.stopTension();
-    snd.startTension(state.limitSec || DEFAULT_LIMIT_SEC);
+    snd.stopBgm();
+    snd.startBgm(state.limitSec || DEFAULT_LIMIT_SEC);
     startTicker();
   } else {
-    snd.stopTension();
+    snd.stopBgm();
     stopTicker();
     stage.classList.remove("tense", "shake");
     if (phase === PHASE.LOCKED && lastPhase === PHASE.OPEN) snd.timeUp();
@@ -183,10 +183,6 @@ function paint() {
   $("#s-cat").style.setProperty("--cat", cat.color);
   $("#s-cat").style.visibility = q ? "visible" : "hidden";
 
-  const isDemo = activeList() === LISTS.DEMO;
-  $("#s-list").textContent = LIST_LABEL[activeList()];
-  $("#s-list").className = isDemo ? "pill lock" : "pill";
-
   tip.textContent = "";
 
   if (phase === PHASE.FINAL)                                 return paintFinal();
@@ -244,9 +240,6 @@ function paintGrid(qid, revealMode) {
 
   el.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
   el.style.gridTemplateRows    = `repeat(${rows}, minmax(0, 1fr))`;
-  // 格子越多字越小
-  el.style.setProperty("--cell-let",  Math.min(7, 26 / rows, 46 / cols).toFixed(2) + "vh");
-  el.style.setProperty("--cell-name", Math.min(2.1, 8 / rows, 15 / cols).toFixed(2) + "vh");
 
   el.innerHTML = gl.map(g => {
     const a = repAns[qid]?.[g.id];
@@ -272,63 +265,77 @@ function paintGrid(qid, revealMode) {
     </div>`;
   }).join("");
 
+  // 字級要從格子「實際拿到的高度」算 —— 出題畫面給整個下半部，
+  // 公布畫面只給 26vh，用固定的 vh 公式會在公布畫面把內容切掉。
+  const cellH = el.clientHeight / rows;
+  const cellW = el.clientWidth  / cols;
+  el.style.setProperty("--cell-let",
+    Math.max(14, Math.min(cellH * 0.5, cellW * 0.42, 120)).toFixed(1) + "px");
+  el.style.setProperty("--cell-name",
+    Math.max(9,  Math.min(cellH * 0.2, cellW * 0.16, 24)).toFixed(1) + "px");
+
   const done = Object.keys(repAns[qid] || {}).length;
-  tip.textContent = revealMode ? "" : `${done} / ${gl.length} 組已確認`;
+  if (!revealMode) tip.textContent = `${done} / ${gl.length} 組已確認`;
 }
 
-/** 公布答案：大字 + 各組對錯格 + 全場組員分布 */
+/**
+ * 公布答案：正解大字與說明「同時」出現，下面接各組對錯格。
+ * 全場作答分布放在第二頁（按 →），因為三樣一起塞進 16:9 會擠到看不清楚。
+ */
 function paintReveal(qid, q) {
   foot.textContent = "已公布答案";
-  tip.textContent  = "按 → 看說明";
+  tip.textContent  = "按 → 看全場作答分布";
 
-  const key = keys[qid];
-  const memberTally = tallyAllMembers(allResp[qid]);
-
-  body.innerHTML = `
-    <div style="display:flex; gap:2.4vw; align-items:center; flex:0 0 auto;">
-      <div style="flex:0 0 26%; text-align:center;">
-        <div class="title-gold" style="font-size:2.8vh;">🎉 正確答案 🎉</div>
-        <div class="reveal-letter huge-letter">${key || "—"}</div>
-      </div>
-      <div style="flex:1 1 auto; min-width:0;">
-        <div class="big-q" style="font-size:2.5vh; padding:1.6vh 1.6vw; margin-bottom:1.6vh;">${escapeHtml(q.text || "")}</div>
-        <div class="bars screen-bars">
-          ${LETTERS.filter(L => q[L.toLowerCase()]).map(L => {
-            const n = memberTally[L], pct = memberTally.total ? Math.round(n / memberTally.total * 100) : 0;
-            return `<div class="bar-row">
-              <span class="bar-key">${L}</span>
-              <span class="bar-opt">${escapeHtml(q[L.toLowerCase()])}</span>
-              <span class="bar-track"><span class="bar-fill${L === key ? " is-correct" : ""}" style="width:${pct}%"></span></span>
-              <span class="bar-num">${pct}%（${n}）</span>
-            </div>`;
-          }).join("")}
-        </div>
-        <p class="hint" style="font-size:1.8vh; margin:.8vh 0 0; text-align:left;">上方為台下組員的整場分布（共 ${memberTally.total} 人）</p>
-      </div>
-    </div>
-    <div class="grid" id="s-grid"></div>`;
-
-  paintGrid(qid, true);
-}
-
-/** 說明頁：文字 + 圖片，由後台提供 */
-function paintExplain(qid, q) {
-  foot.textContent = "題目說明";
-  tip.textContent  = "按 ← 回到答案";
-
+  const key    = keys[qid];
   const hasImg = !!(q.exImg || "").trim();
   const text   = (q.exText || "").trim();
 
   body.innerHTML = `
-    <h2 class="title-gold center" style="font-size:3.6vh; margin:0 0 1.4vh;">💡 說明</h2>
-    <div class="explain ${hasImg ? "" : "noimg"}" id="s-explain">
-      <div class="txt" id="s-extext">${text ? escapeHtml(text) : "（這一題後台還沒有填說明）"}</div>
-      <div class="pic">${hasImg ? `<img src="${escapeHtml(q.exImg)}" alt="說明圖片"
-        onerror="this.closest('.explain').classList.add('noimg')">` : ""}</div>
-    </div>`;
+    <div class="reveal-top">
+      <div class="reveal-ans">
+        <div class="title-gold" style="font-size:2.4vh;">🎉 正確答案 🎉</div>
+        <div class="reveal-letter">${key || "—"}</div>
+      </div>
+      <div class="reveal-ex">
+        <h3 class="title-gold" style="font-size:2.6vh; margin:0 0 1vh;">💡 說明</h3>
+        <div class="explain ${hasImg ? "" : "noimg"}">
+          <div class="txt" id="s-extext">${text ? escapeHtml(text) : "（這一題後台還沒有填說明）"}</div>
+          <div class="pic">${hasImg ? `<img src="${escapeHtml(q.exImg)}" alt="說明圖片"
+            onerror="this.closest('.explain').classList.add('noimg')">` : ""}</div>
+        </div>
+      </div>
+    </div>
+    <div class="grid" id="s-grid" style="flex:0 0 26vh;"></div>`;
 
   const t = $("#s-extext");
-  fitToBox(t, t, "font-size", 2.8, 1.4);
+  fitToBox(t, t, "font-size", 2.6, 1.2);
+  paintGrid(qid, true);
+}
+
+/** 公布階段的第二頁：全場台下學員的作答分布 */
+function paintDistribution(qid, q) {
+  foot.textContent = "全場作答分布";
+  tip.textContent  = "按 ← 回到答案與說明";
+
+  const key = keys[qid];
+  const t   = tallyAllMembers(allResp[qid]);
+
+  body.innerHTML = `
+    <div class="big-q" style="font-size:2.6vh; padding:1.8vh 2vw; flex:0 0 auto;">${escapeHtml(q.text || "")}</div>
+    <div class="bars screen-bars" style="flex:0 0 auto; margin-top:1.6vh;">
+      ${LETTERS.filter(L => q[L.toLowerCase()]).map(L => {
+        const n = t[L], pct = t.total ? Math.round(n / t.total * 100) : 0;
+        return `<div class="bar-row">
+          <span class="bar-key">${L}</span>
+          <span class="bar-opt">${escapeHtml(q[L.toLowerCase()])}</span>
+          <span class="bar-track"><span class="bar-fill${L === key ? " is-correct" : ""}" style="width:${pct}%"></span></span>
+          <span class="bar-num">${pct}%（${n}）</span>
+        </div>`;
+      }).join("")}
+    </div>
+    <p class="hint center" style="font-size:1.9vh; margin:1.4vh 0 0;">
+      台下學員共 ${t.total} 人作答　正解 <b style="color:var(--gold)">${key || "—"}</b>
+    </p>`;
 }
 
 // ------------------------------------------------------------
@@ -336,13 +343,13 @@ function paintExplain(qid, q) {
 // ------------------------------------------------------------
 addEventListener("keydown", e => {
   if ((state.phase || "") !== PHASE.REVEAL) return;
-  if (e.key === "ArrowRight") { revealView = "explain"; repaintReveal(); }
-  if (e.key === "ArrowLeft")  { revealView = "answer";  repaintReveal(); }
+  if (e.key === "ArrowRight") { revealView = "dist";   repaintReveal(); }
+  if (e.key === "ArrowLeft")  { revealView = "answer"; repaintReveal(); }
 });
 function repaintReveal() {
   const qid = state.qid, q = qid ? questions[qid] : null;
   if (!q) return;
-  revealView === "explain" ? paintExplain(qid, q) : paintReveal(qid, q);
+  revealView === "dist" ? paintDistribution(qid, q) : paintReveal(qid, q);
 }
 
 // ------------------------------------------------------------
@@ -365,14 +372,14 @@ function paintFinal() {
       <table class="rank rank-screen">
         <thead><tr>
           <th style="width:8vh;">#</th><th>組別</th>
-          <th class="n">總分</th><th class="n">代表答對</th><th class="n">組員過半</th>
+          <th class="n">總分</th><th class="n">代表答對</th><th class="n">學員過半</th>
         </tr></thead>
         <tbody>${
           rows.length
             ? rows.map((r, i) => `<tr class="${i === 0 ? "top1" : ""}">
                 <td>${i === 0 ? "🏆" : i + 1}</td>
                 <td>${escapeHtml(r.name)}</td>
-                <td class="n">${r.points}<small style="opacity:.55"> / ${r.max}</small></td>
+                <td class="n">${r.points}</td>
                 <td class="n">${r.repCorrect}</td>
                 <td class="n">${r.memberBonus}</td>
               </tr>`).join("")

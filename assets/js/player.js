@@ -1,6 +1,6 @@
 // ============================================================
 //  玩家端 —— 手機直式
-//  分兩種身分：上台代表（一組一位，決定最終答案）與台下組員。
+//  分兩種身分：上台代表（一組一位，決定最終答案）與台下學員。
 // ============================================================
 
 import {
@@ -34,7 +34,7 @@ let renderedQid = null;
 let revealedQid = null;
 let pending     = null;   // 代表按了選項但還沒確認的字母
 
-// 組員自己的選擇存本機。/responses 組員讀不回來（規則只放行本組代表），
+// 學員自己的選擇存本機。/responses 學員讀不回來（規則只放行本組代表），
 // 所以重新整理後要靠這裡記得自己選了什麼。
 const myPick    = qid => localStorage.getItem("cdf_pick_" + qid) || null;
 const setMyPick = (qid, c) => localStorage.setItem("cdf_pick_" + qid, c);
@@ -59,7 +59,7 @@ function fail(err) {
 }
 
 // ------------------------------------------------------------
-//  啟動：先匿名登入，才有身分可以寫資料、代表才讀得到組員作答
+//  啟動：先匿名登入，才有身分可以寫資料、代表才讀得到學員作答
 // ------------------------------------------------------------
 (async function boot() {
   goto(myGroup && myRole ? "wait" : "group");
@@ -94,11 +94,13 @@ const selGroup = $("#sel-group");
 
 function paintGroupSelect() {
   const list = toSortedList(groups);
+  const inProgress = selGroup.value;      // 只保留「這次」已經選的，不從 localStorage 帶
   selGroup.innerHTML = list.length
     ? '<option value="">— 請選擇 —</option>' +
       list.map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`).join("")
     : '<option value="">（後台尚未建立組別）</option>';
-  if (myGroup && groups[myGroup]) selGroup.value = myGroup;
+  // 刻意不預先選好 —— 一定要學員自己挑，避免整組人不小心都留在第一組
+  selGroup.value = groups[inProgress] ? inProgress : "";
   $("#btn-group-next").disabled = !selGroup.value;
 }
 
@@ -156,7 +158,7 @@ $("#pick-rep").addEventListener("click", async () => {
 });
 
 $("#pick-member").addEventListener("click", async () => {
-  // 原本是代表又改當組員，就把位子還回去
+  // 原本是代表又改當學員，就把位子還回去
   if (reps[myGroup]?.uid === uid) {
     try { await remove(ref(db, `${PATH.reps}/${myGroup}`)); } catch {}
   }
@@ -173,7 +175,7 @@ const isRep = () => myRole === ROLE.REP;
 function paintIdBar() {
   $("#id-group").textContent = groups[myGroup]?.name || "—";
   const r = $("#id-role");
-  r.textContent = isRep() ? "🎤 上台代表" : "📱 台下組員";
+  r.textContent = isRep() ? "🎤 上台代表" : "📱 台下學員";
   r.className = isRep() ? "pill live" : "pill";
 }
 
@@ -302,7 +304,7 @@ function paintButtons(qid, locked) {
     $("#q-hint").textContent = confirmedLetter
       ? `已送出 ${confirmedLetter}，等待主持人公布答案。`
       : locked ? "已截止作答。"
-      : "先看組員的比例，再選一個選項並按確認送出。";
+      : "先看學員的比例，再選一個選項並按確認送出。";
   } else {
     $("#q-hint").textContent = locked
       ? (mine ? `已截止，你選的是 ${mine}。` : "已截止作答，這題你沒有作答。")
@@ -436,8 +438,8 @@ function renderReveal(qid, q) {
     $("#r-detail").innerHTML = [
       `代表：${s.repChoice || "未作答"} ${s.repOk ? "✅ +1" : "❌"}`,
       s.memberRate === null
-        ? "組員：沒有人作答"
-        : `組員答對率：${s.memberRate}%（${s.memberCorrect}/${t.total}）${s.memberOk ? "✅ 過半 +1" : "❌ 未過半"}`
+        ? "學員：沒有人作答"
+        : `學員答對率：${s.memberRate}%（${s.memberCorrect}/${t.total}）${s.memberOk ? "✅ 過半 +1" : "❌ 未過半"}`
     ].join("<br>");
   };
 
@@ -446,7 +448,7 @@ function renderReveal(qid, q) {
   // 正解：安全性規則規定「已公布」才讀得到
   unsubKey = onValue(ref(db, `${PATH.answerKey}/${qid}`), s => { key = s.val(); repaint(); }, () => {});
   unsubRepAns = onValue(ref(db, `${PATH.repAnswers}/${qid}/${myGroup}`), s => { repAns = s.val(); repaint(); }, () => {});
-  // 組員分布：代表讀得到即時資料；組員讀不到，就只顯示自己的部分
+  // 學員分布：代表讀得到即時資料；學員讀不到，就只顯示自己的部分
   if (isRep()) {
     unsubRevMembers = onValue(ref(db, `${PATH.responses}/${qid}/${myGroup}`),
       s => { members = s.val(); repaint(); }, () => {});
