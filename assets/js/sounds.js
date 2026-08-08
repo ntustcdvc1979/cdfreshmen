@@ -285,11 +285,37 @@ export function confirmed() {
   noise({ dur: 0.06, gain: 0.10, hp: 3000, at: 0.085 });
 }
 
-/** 時間到 */
+/**
+ * 時間到。
+ * 刻意不用往下滑音 —— 下墜的音高聽起來像在嘲笑人，改成乾脆的一記撞擊：
+ * 低頻衝擊 + 被掐住的金屬鑼聲 + 一記沉的小調和弦收尾。
+ */
 export function timeUp() {
   stopBgm();
-  blip({ freq: 220, dur: 0.5, type: "sawtooth", gain: 0.3, glideTo: 110 });
-  noise({ dur: 0.3, gain: 0.16, hp: 400 });
+  if (!enabled) return;
+  const t = ctx.currentTime;
+
+  // 低頻衝擊，短促、收得乾淨
+  const thud = ctx.createOscillator();
+  const tg   = ctx.createGain();
+  thud.type = "sine";
+  thud.frequency.setValueAtTime(98, t);
+  thud.frequency.linearRampToValueAtTime(74, t + 0.09);
+  tg.gain.setValueAtTime(0.55, t);
+  tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+  thud.connect(tg).connect(master);
+  thud.start(t);
+  thud.stop(t + 0.32);
+
+  // 金屬撞擊：非整數倍的泛音疊起來，像鑼被掐住的那一下
+  [1245, 1867, 2490, 3320].forEach((f, i) => {
+    blip({ freq: f, dur: 0.34 - i * 0.055, type: "triangle", gain: 0.15 - i * 0.028 });
+  });
+  noise({ dur: 0.13, gain: 0.2, hp: 1500 });
+
+  // A 小調和弦收尾，給「結束了」的重量
+  [110, 131, 165].forEach(f =>
+    blip({ freq: f, dur: 0.8, type: "triangle", gain: 0.1, at: 0.02 }));
 }
 
 /** 公布答案 —— 上揚的和弦 */

@@ -176,12 +176,16 @@ function paint() {
   const qid   = state.qid || null;
   const q     = qid ? questions[qid] : null;
 
-  badge.innerHTML = q ? `第 <b>${qIndex(qid) + 1}</b> 題` : `第 <b>–</b> 題`;
+  // 待機與最終排行榜跟「某一題」無關，題號與類別整個藏起來
+  const onQuestion = !!q && phase !== PHASE.IDLE && phase !== PHASE.FINAL;
+
+  badge.innerHTML = onQuestion ? `第 <b>${qIndex(qid) + 1}</b> 題` : "";
+  badge.style.display = onQuestion ? "" : "none";
 
   const cat = categoryOf(q?.cat);
-  $("#s-cat").textContent = q ? cat.name : "—";
+  $("#s-cat").textContent = onQuestion ? cat.name : "";
   $("#s-cat").style.setProperty("--cat", cat.color);
-  $("#s-cat").style.visibility = q ? "visible" : "hidden";
+  $("#s-cat").style.display = onQuestion ? "" : "none";
 
   tip.textContent = "";
 
