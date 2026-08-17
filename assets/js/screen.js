@@ -25,8 +25,8 @@ const tip   = $("#s-tip");
 
 // 結束畫面在「排行榜」與「類別分析」之間切換
 let finalView = "rank";
-// 公布階段在「答案」與「說明」之間切換
-let revealView = "answer";
+// 公布階段的頁序：答案＋說明 →（整頁大圖，有填才有）→ 全場作答分布
+let revealPage = 0;
 
 // ------------------------------------------------------------
 //  音效解鎖
@@ -104,8 +104,9 @@ function onStateChange() {
 
   if (qid !== lastQid) {
     seenReps = new Set(Object.keys(repAns[qid] || {}));
-    revealView = "answer";                 // 換題就回到答案頁
+    revealPage = 0;                        // 換題就回到答案頁
   }
+  if (phase === PHASE.REVEAL && lastPhase !== PHASE.REVEAL) revealPage = 0;
   lastPhase = phase;
   lastQid = qid;
 }
@@ -288,7 +289,6 @@ function paintGrid(qid, revealMode) {
  */
 function paintReveal(qid, q) {
   foot.textContent = "已公布答案";
-  tip.textContent  = "按 → 看全場作答分布";
 
   const key    = keys[qid];
   const hasImg = !!(q.exImg || "").trim();
@@ -316,10 +316,19 @@ function paintReveal(qid, q) {
   paintGrid(qid, true);
 }
 
-/** 公布階段的第二頁：全場台下學員的作答分布 */
+/** 補充大圖：整頁只放一張圖，適合流程圖、對照表這種要看細節的東西 */
+function paintFullImage(qid, q) {
+  foot.textContent = "補充說明";
+  body.innerHTML = `
+    <div class="fullimg">
+      <img src="${escapeHtml(q.exImgFull)}" alt="補充說明大圖"
+           onerror="this.parentElement.innerHTML='<p class=&quot;hint&quot; style=&quot;font-size:2.4vh&quot;>圖片載不出來，請確認後台填的網址</p>'">
+    </div>`;
+}
+
+/** 全場台下學員的作答分布 */
 function paintDistribution(qid, q) {
   foot.textContent = "全場作答分布";
-  tip.textContent  = "按 ← 回到答案與說明";
 
   const key = keys[qid];
   const t   = tallyAllMembers(allResp[qid]);
@@ -345,16 +354,43 @@ function paintDistribution(qid, q) {
 // ------------------------------------------------------------
 //  公布階段的左右鍵：答案 ⇄ 說明
 // ------------------------------------------------------------
+/** 這一題公布階段有哪幾頁 —— 沒填整頁大圖就不會有那一頁 */
+function revealPages(q) {
+  const pages = ["answer"];
+  if ((q?.exImgFull || "").trim()) pages.push("fullimg");
+  pages.push("dist");
+  return pages;
+}
+
 addEventListener("keydown", e => {
   if ((state.phase || "") !== PHASE.REVEAL) return;
-  if (e.key === "ArrowRight") { revealView = "dist";   repaintReveal(); }
-  if (e.key === "ArrowLeft")  { revealView = "answer"; repaintReveal(); }
+  const q = state.qid ? questions[state.qid] : null;
+  if (!q) return;
+  const last = revealPages(q).length - 1;
+  if (e.key === "ArrowRight") { revealPage = Math.min(last, revealPage + 1); repaintReveal(); }
+  if (e.key === "ArrowLeft")  { revealPage = Math.max(0,    revealPage - 1); repaintReveal(); }
 });
+
 function repaintReveal() {
   const qid = state.qid, q = qid ? questions[qid] : null;
   if (!q) return;
-  revealView === "dist" ? paintDistribution(qid, q) : paintReveal(qid, q);
+  const pages = revealPages(q);
+  revealPage = Math.min(revealPage, pages.length - 1);
+
+  const painter = { answer: paintReveal, fullimg: paintFullImage, dist: paintDistribution };
+  painter[pages[revealPage]](qid, q);
+
+  // 頁尾提示要照實際頁序給，不然主持人會不知道還有沒有下一頁
+  const prev = revealPage > 0 ? "← " + PAGE_NAME[pages[revealPage - 1]] : "";
+  const next = revealPage < pages.length - 1 ? PAGE_NAME[pages[revealPage + 1]] + " →" : "";
+  tip.textContent = [prev, next].filter(Boolean).join("　　");
 }
+
+const PAGE_NAME = {
+  answer:  "答案與說明",
+  fullimg: "補充大圖",
+  dist:    "全場作答分布"
+};
 
 // ------------------------------------------------------------
 //  最終畫面

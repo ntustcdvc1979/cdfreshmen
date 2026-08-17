@@ -181,13 +181,36 @@
     font-size: var(--ex-fs, 2.4vh); line-height: 1.55; color: #e6eeff;
     white-space: pre-wrap;
   }
-  .explain .pic { flex: 0 0 38%; display: grid; place-items: center; min-width: 0; }
+  /* grid 的軌道要用 minmax(0, 1fr) 夾住，否則軌道會被圖片撐高，
+     img 的 max-height:100% 就失去參考對象，圖會被切掉 */
+  .explain .pic {
+    flex: 0 0 38%; min-width: 0;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    place-items: center;
+  }
   .explain .pic img {
     max-width: 100%; max-height: 100%; object-fit: contain;
     border-radius: 1.2vh;
     box-shadow: 0 0 0 .3vh rgba(255,200,31,.4), 0 1.4vh 4vh rgba(0,0,0,.6);
   }
   .explain.noimg .pic { display: none; }
+
+  /* ---------- 補充大圖：整頁只放一張圖 ---------- */
+  .fullimg {
+    flex: 1 1 auto; min-height: 0;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    place-items: center;
+  }
+  .fullimg img {
+    max-width: 100%; max-height: 100%;
+    object-fit: contain;
+    border-radius: 1vh;
+    box-shadow: 0 0 0 .3vh rgba(255,200,31,.4), 0 2vh 5vh rgba(0,0,0,.65);
+  }
 
   /* ---------- 統計條 ---------- */
   .screen-bars { display: grid; gap: 1.3vh; }

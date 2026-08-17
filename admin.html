@@ -114,17 +114,29 @@
         <textarea id="ed-extext" style="min-height:110px;" placeholder="為什麼是這個答案、想讓新生帶走什麼觀念…（可留空）"></textarea>
       </div>
       <div class="field">
-        <label for="ed-eximg">說明圖片網址</label>
+        <label for="ed-eximg">說明圖片網址（跟文字併排，選填）</label>
         <input id="ed-eximg" placeholder="https://… 或 assets/img/explain/q1.png">
       </div>
-      <p class="hint" style="text-align:left; margin:0;">
-        圖片有兩種放法：①貼一個外部圖片直連網址；
-        ②把圖片檔放進 repo 的 <code>assets/img/explain/</code> 資料夾，這裡填
-        <code>assets/img/explain/檔名.png</code>。留空就只顯示文字。
-      </p>
       <div id="ed-preview" class="center hidden" style="margin:4px 0;">
-        <img id="ed-preview-img" alt="預覽" style="max-width:100%; max-height:220px; border-radius:10px; box-shadow:0 0 0 2px rgba(255,200,31,.35);">
+        <img id="ed-preview-img" alt="預覽" style="max-width:100%; max-height:200px; border-radius:10px; box-shadow:0 0 0 2px rgba(255,200,31,.35);">
       </div>
+
+      <div class="field">
+        <label for="ed-eximgfull">整頁大圖網址（自己獨立一頁，選填）</label>
+        <input id="ed-eximgfull" placeholder="https://… 或 assets/img/explain/q1-full.png">
+      </div>
+      <div id="ed-preview-full" class="center hidden" style="margin:4px 0;">
+        <img id="ed-preview-full-img" alt="整頁大圖預覽" style="max-width:100%; max-height:200px; border-radius:10px; box-shadow:0 0 0 2px rgba(53,168,255,.45);">
+      </div>
+
+      <p class="hint" style="text-align:left; margin:0;">
+        兩個圖片欄位都是選填，可以只填一個、也可以都填。
+        <b>說明圖片</b>會跟說明文字併排在同一頁；<b>整頁大圖</b>會單獨佔滿一整個投影畫面，
+        適合放流程圖、對照表這種需要看細節的東西。<br>
+        圖片有兩種放法：①貼一個外部圖片直連網址；
+        ②把檔案放進 repo 的 <code>assets/img/explain/</code>，這裡填
+        <code>assets/img/explain/檔名.png</code>。
+      </p>
 
       <div class="row">
         <button id="ed-save"   class="btn" style="flex:1 1 140px;">儲存</button>

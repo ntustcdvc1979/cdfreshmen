@@ -91,7 +91,8 @@ export function authErrorText(e) {
 // ---------- 資料庫路徑 ----------
 //  /admins/{uid}                  = true                            ← 主持人白名單，只能從主控台改
 //  /config/groups/{gid}           = { name, order }
-//  /questions/{qid}               = { order, text, a,b,c,d, cat, list, exText, exImg }
+//  /questions/{qid}               = { order, text, a,b,c,d, cat, list,
+//                                     exText, exImg, exImgFull }
 //                                                                    ← 公開可讀，不含正解
 //  /answerKey/{qid}               = "A"                              ← 只有公布後才讀得到
 //  /state                         = { phase, list, qid, openedAt, limitSec,

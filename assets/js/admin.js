@@ -29,10 +29,15 @@ $("#sel-list").addEventListener("change", () => {
 
 // 圖片網址即時預覽
 $("#ed-eximg").addEventListener("input", paintPreview);
+$("#ed-eximgfull").addEventListener("input", paintPreview);
 function paintPreview() {
   const url = $("#ed-eximg").value.trim();
   show($("#ed-preview"), !!url);
   if (url) $("#ed-preview-img").src = url;
+
+  const full = $("#ed-eximgfull").value.trim();
+  show($("#ed-preview-full"), !!full);
+  if (full) $("#ed-preview-full-img").src = full;
 }
 
 // ---------- 登入 ----------
@@ -146,7 +151,7 @@ function paintQuestions() {
 
   $("#q-list").innerHTML = list.map((q, i) => {
     const cat = categoryOf(q.cat);
-    const hasEx = !!(q.exText || "").trim() || !!(q.exImg || "").trim();
+    const hasEx = !!(q.exText || "").trim() || !!(q.exImg || "").trim() || !!(q.exImgFull || "").trim();
     return `
     <div class="qitem ${editing === q.id ? "editing" : ""}" data-qid="${escapeHtml(q.id)}">
       <div class="head">
@@ -157,7 +162,8 @@ function paintQuestions() {
       <div class="meta">
         <span class="cat-pill" style="--cat:${cat.color}">${escapeHtml(cat.name)}</span>
         <span class="flag ${hasEx ? "ok" : "warn"}">${hasEx ? "有說明" : "⚠ 沒有說明"}</span>
-        ${(q.exImg || "").trim() ? `<span class="flag">含圖片</span>` : ""}
+        ${(q.exImg || "").trim()     ? `<span class="flag">含圖片</span>` : ""}
+        ${(q.exImgFull || "").trim() ? `<span class="flag">含整頁大圖</span>` : ""}
       </div>
       <div class="row" style="margin-top:10px;">
         <button class="btn ghost mini q-edit">編輯</button>
@@ -193,8 +199,9 @@ function openEditor(qid) {
   $("#ed-cat").value    = q.cat || "";
   $("#ed-list").value   = qid === "new" ? curList : listOf(q);
   $("#ed-text").value   = q.text || "";
-  $("#ed-extext").value = q.exText || "";
-  $("#ed-eximg").value  = q.exImg || "";
+  $("#ed-extext").value    = q.exText || "";
+  $("#ed-eximg").value     = q.exImg || "";
+  $("#ed-eximgfull").value = q.exImgFull || "";
   for (const L of LETTERS) $("#ed-" + L.toLowerCase()).value = q[L.toLowerCase()] || "";
   $("#ed-key").value = (qid === "new" ? "A" : keys[qid]) || "A";
 
@@ -221,10 +228,12 @@ $("#ed-save").addEventListener("click", async () => {
   if ($("#ed-cat").value) data.cat = $("#ed-cat").value;
   data.list = $("#ed-list").value === LISTS.DEMO ? LISTS.DEMO : LISTS.MAIN;
 
-  const exText = $("#ed-extext").value.trim();
-  const exImg  = $("#ed-eximg").value.trim();
-  if (exText) data.exText = exText;
-  if (exImg)  data.exImg  = exImg;
+  const exText   = $("#ed-extext").value.trim();
+  const exImg    = $("#ed-eximg").value.trim();
+  const exImgFull = $("#ed-eximgfull").value.trim();
+  if (exText)    data.exText    = exText;
+  if (exImg)     data.exImg     = exImg;
+  if (exImgFull) data.exImgFull = exImgFull;
 
   for (const L of LETTERS) {
     const v = $("#ed-" + L.toLowerCase()).value.trim();
