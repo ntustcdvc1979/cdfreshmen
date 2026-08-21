@@ -285,6 +285,21 @@ export function confirmed() {
   noise({ dur: 0.06, gain: 0.10, hp: 3000, at: 0.085 });
 }
 
+/** 轉盤每經過一格的「答」聲。轉快的時候會連成一串答答答。 */
+export function wheelTick() {
+  if (!enabled) return;
+  blip({ freq: 1500, dur: 0.035, type: "square", gain: 0.16 });
+  noise({ dur: 0.022, gain: 0.09, hp: 4000 });
+}
+
+/** 轉盤停下來 */
+export function wheelStop() {
+  blip({ freq: 660,  dur: 0.14, type: "triangle", gain: 0.3 });
+  blip({ freq: 990,  dur: 0.2,  type: "triangle", gain: 0.28, at: 0.1 });
+  blip({ freq: 1320, dur: 0.34, type: "triangle", gain: 0.26, at: 0.2 });
+  noise({ dur: 0.25, gain: 0.12, hp: 2000, at: 0.2 });
+}
+
 /** 有一組代表就位 —— 比「確認送出」輕，是報到不是定案 */
 export function joined() {
   blip({ freq: 587, dur: 0.09, type: "sine", gain: 0.24 });

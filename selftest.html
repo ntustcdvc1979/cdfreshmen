@@ -116,6 +116,33 @@ ok("配分 3：全對 → 6 分", w.points === 6 && w.pts === 3, JSON.stringify(
 w = scoreOne("A", {c:"B"}, {u1:{c:"A"},u2:{c:"A"}}, 3);
 ok("配分 3：只有學員過半 → 3 分", w.points === 3);
 
+// ════════ 3c. 轉盤加倍 ════════
+//  q1 讓 g3 加倍：g3 在 q1 是 代表✘ + 學員33%✘ → 還是 0 分，但滿分要變大
+const dbl1 = buildScoreboard(groups, questions, keys, responses, repAnswers, revealed, LISTS.MAIN, { q1: "g3" });
+const d1 = Object.fromEntries(dbl1.rows.map(r => [r.gid, r]));
+ok("加倍組的滿分變大（g3 10 → 12）", d1.g3.max === 12, String(d1.g3.max));
+ok("沒被加倍的組滿分不變", d1.g1.max === 10 && d1.g2.max === 10, d1.g1.max + "/" + d1.g2.max);
+ok("加倍但答錯，分數不變（3）", d1.g3.points === 3, String(d1.g3.points));
+
+//  q1 讓 g1 加倍：g1 在 q1 是 代表✔ + 學員67%✔ = 2 分 → 變 4 分，總分 3 → 5
+const dbl2 = buildScoreboard(groups, questions, keys, responses, repAnswers, revealed, LISTS.MAIN, { q1: "g1" });
+const d2 = Object.fromEntries(dbl2.rows.map(r => [r.gid, r]));
+ok("加倍且全對 → 該題 2 分變 4 分（總分 3→5）", d2.g1.points === 5, String(d2.g1.points));
+ok("加倍只影響被抽中的那一組", d2.g2.points === 8 && d2.g3.points === 3,
+   d2.g2.points + "/" + d2.g3.points);
+
+//  加權題（q3 配分 3）再加倍 → 該題等於配分 6
+const dbl3 = buildScoreboard(groups, questions, keys, responses, repAnswers, revealed, LISTS.MAIN, { q3: "g2" });
+const d3 = Object.fromEntries(dbl3.rows.map(r => [r.gid, r]));
+ok("加權題再加倍：g2 的 q3 從 6 分變 12（總分 8→14）", d3.g2.points === 14, String(d3.g2.points));
+ok("加權題加倍後滿分 10 → 16", d3.g2.max === 16, String(d3.g2.max));
+
+ok("沒傳 doubles 時行為不變",
+   JSON.stringify(buildScoreboard(groups,questions,keys,responses,repAnswers,revealed,LISTS.MAIN).rows.map(r=>r.points))
+   === JSON.stringify(board.rows.map(r=>r.points)));
+ok("doubles 指向不存在的題目不會出事",
+   buildScoreboard(groups,questions,keys,responses,repAnswers,revealed,LISTS.MAIN,{qZZ:"g1"}).rows[0].points === 8);
+
 // ════════ 4. 類別矩陣 ════════
 const mx = categoryMatrix(board);
 ok("只出現有公布題目的類別", mx.cats.map(c=>c.id).join(",") === "social,emotion", mx.cats.map(c=>c.id).join(","));

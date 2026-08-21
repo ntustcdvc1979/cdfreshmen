@@ -16,7 +16,7 @@ import {
 
 import * as snd from "./sounds.js";
 
-let groups = {}, questions = {}, keys = {}, allResp = {}, repAns = {}, reps = {}, state = {}, board = null, intro = {};
+let groups = {}, questions = {}, keys = {}, allResp = {}, repAns = {}, reps = {}, state = {}, board = null, intro = {}, doubles = {};
 let ready = false, timeOffset = 0;
 
 const stage = $("#stage");
@@ -69,9 +69,10 @@ onAuthStateChanged(auth, async user => {
   onValue(ref(db, PATH.answerKey),   s => { keys      = s.val() || {}; paint(); });
   onValue(ref(db, PATH.responses),   s => { allResp   = s.val() || {}; paint(); });
   onValue(ref(db, PATH.leaderboard), s => { board     = s.val();       paint(); });
+  onValue(ref(db, PATH.doubles),     s => { doubles   = s.val() || {}; paint(); });
   onValue(ref(db, PATH.reps),        s => { reps      = s.val() || {}; onReps(); paint(); });
   onValue(ref(db, PATH.repAnswers),  s => { repAns    = s.val() || {}; onRepAnswers(); paint(); });
-  onValue(ref(db, PATH.state),       s => { state     = s.val() || {}; onStateChange(); paint(); });
+  onValue(ref(db, PATH.state),       s => { state = s.val() || {}; onStateChange(); onWheel(); paint(); });
 });
 
 // ------------------------------------------------------------
@@ -105,6 +106,93 @@ function onStateChange() {
 
   lastPhase = phase;
   lastQid = qid;
+}
+
+// ------------------------------------------------------------
+//  加倍轉盤
+// ------------------------------------------------------------
+let lastWheelId = null;
+
+function onWheel() {
+  const w = state.wheel;
+  if (!w || !w.id || w.id === lastWheelId) return;
+  lastWheelId = w.id;
+  spinWheel(w.gid);
+}
+
+/** 主持人按下轉盤 → 全螢幕蓋上轉盤並轉到指定的組 */
+function spinWheel(targetGid) {
+  const gl = toSortedList(groups);
+  if (!gl.length) return;
+  const n = gl.length;
+  const idx = Math.max(0, gl.findIndex(g => g.id === targetGid));
+  const seg = 360 / n;
+
+  document.querySelector(".wheel-overlay")?.remove();
+  const ov = document.createElement("div");
+  ov.className = "wheel-overlay";
+  ov.innerHTML = `
+    <h2 class="title-gold">🎡 分數加倍轉盤 🎡</h2>
+    <div class="wheel-stage">
+      <div class="wheel-ptr"></div>
+      <div class="wheel-hub">×2</div>
+      <svg viewBox="-105 -105 210 210" aria-hidden="true">
+        <g class="wheel-spin" id="wheel-spin">${wheelSvg(gl, seg)}</g>
+      </svg>
+    </div>
+    <div class="wheel-result pending" id="wheel-result">轉盤轉動中…</div>`;
+  stage.appendChild(ov);
+
+  // 指針在 12 點鐘方向；要讓第 idx 格停在指針下，就把它的中心角轉到 -90°
+  const centre = idx * seg + seg / 2;
+  const turns  = 6;
+  const finalR = turns * 360 + (270 - centre);
+  const dur    = 5200;
+  const spin   = ov.querySelector("#wheel-spin");
+  const t0     = performance.now();
+  let lastSeg  = null;
+
+  function frame(now) {
+    const p = Math.min(1, (now - t0) / dur);
+    const eased = 1 - Math.pow(1 - p, 4);          // ease-out：先快後慢
+    const r = finalR * eased;
+    spin.style.transform = `rotate(${r}deg)`;
+
+    const segIdx = Math.floor(r / seg);
+    if (segIdx !== lastSeg) { lastSeg = segIdx; snd.wheelTick(); }
+
+    if (p < 1) { requestAnimationFrame(frame); return; }
+
+    snd.wheelStop();
+    const res = ov.querySelector("#wheel-result");
+    res.className = "wheel-result";
+    res.innerHTML = `<span class="who">${escapeHtml(gl[idx].name)}</span>
+                     <span class="x2">下一題 ×2</span>`;
+    setTimeout(() => ov.remove(), 6000);
+  }
+  requestAnimationFrame(frame);
+}
+
+/** 轉盤的扇形與文字 */
+function wheelSvg(gl, seg) {
+  const R = 100;
+  const palette = ["#1f3f9e", "#2a56c6"];
+  return gl.map((g, i) => {
+    const a0 = (i * seg - 90) * Math.PI / 180;
+    const a1 = ((i + 1) * seg - 90) * Math.PI / 180;
+    const x0 = (R * Math.cos(a0)).toFixed(2), y0 = (R * Math.sin(a0)).toFixed(2);
+    const x1 = (R * Math.cos(a1)).toFixed(2), y1 = (R * Math.sin(a1)).toFixed(2);
+    const big = seg > 180 ? 1 : 0;
+    const mid = (i * seg + seg / 2 - 90);
+    const tx  = (R * 0.62 * Math.cos(mid * Math.PI / 180)).toFixed(2);
+    const ty  = (R * 0.62 * Math.sin(mid * Math.PI / 180)).toFixed(2);
+    const fs  = Math.max(4.5, Math.min(11, 190 / gl.length)).toFixed(1);
+    return `<path d="M0 0 L ${x0} ${y0} A ${R} ${R} 0 ${big} 1 ${x1} ${y1} Z"
+              fill="${palette[i % 2]}" stroke="#ffc81f" stroke-width="0.8"/>
+            <text x="${tx}" y="${ty}" fill="#fff" font-size="${fs}" font-weight="900"
+              text-anchor="middle" dominant-baseline="central"
+              transform="rotate(${mid + 90} ${tx} ${ty})">${escapeHtml(g.name)}</text>`;
+  }).join("");
 }
 
 // 有新的組別代表就位就發出提示音（開場的掃碼頁最需要這個回饋）
@@ -237,7 +325,7 @@ const PAGE_NAME = {
 const INTRO_NAME = ["六大主題", "遊戲規則", "掃碼進場"];
 
 function scoreboardNow() {
-  return buildScoreboard(groups, questions, keys, allResp, repAns, state.revealed, LISTS.MAIN);
+  return buildScoreboard(groups, questions, keys, allResp, repAns, state.revealed, LISTS.MAIN, doubles);
 }
 
 // ------------------------------------------------------------
@@ -479,10 +567,13 @@ function paintGrid(qid, revealMode) {
   el.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
   el.style.gridTemplateRows    = `repeat(${rows}, minmax(0, 1fr))`;
 
+  const doubledGid = doubles[qid] || null;
+
   el.innerHTML = gl.map(g => {
     const a = repAns[qid]?.[g.id];
     const c = LETTERS.includes(a?.c) ? a.c : null;
     const cls = ["cellbox"];
+    if (g.id === doubledGid) cls.push("doubled");
     let mark = "";
     if (c) {
       cls.push("done");
@@ -497,6 +588,7 @@ function paintGrid(qid, revealMode) {
       : `<span class="waiting">···</span>`;
     return `<div class="${cls.join(" ")}">
       <span class="gname">${escapeHtml(g.name)}</span>
+      ${g.id === doubledGid ? `<span class="x2tag">×2</span>` : ""}
       ${inner}
       ${mark ? `<span class="mark">${mark}</span>` : ""}
     </div>`;

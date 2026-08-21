@@ -191,6 +191,27 @@ code {
   box-shadow: 0 0 16px rgba(255,200,31,.65);
 }
 
+/* 轉盤加倍：×2 徽章與待機時的通知條 */
+.x2-badge {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center;
+  padding: 5px 13px;
+  font-size: 17px; font-weight: 900; line-height: 1; color: #fff;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff7a90, #cc1f3d);
+  box-shadow: 0 0 16px rgba(255,84,112,.7);
+}
+.dbl-banner {
+  margin-top: 12px; padding: 12px 16px;
+  border-radius: 12px; text-align: center;
+  font-size: 15px; font-weight: 800; color: #fff;
+  background: linear-gradient(180deg, rgba(255,122,144,.9), rgba(204,31,61,.9));
+  box-shadow: 0 0 22px rgba(255,84,112,.6);
+  animation: dbl-pulse 1.6s ease-in-out infinite;
+}
+.dbl-banner b { color: var(--gold-lt); }
+@keyframes dbl-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+
 /* ---------- 題號徽章 ---------- */
 .qbadge {
   display: inline-flex;

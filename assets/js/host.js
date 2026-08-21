@@ -11,7 +11,7 @@ import {
   isHost, notHostHtml, $, show, toast, toSortedList, escapeHtml
 } from "./common.js";
 
-let groups = {}, questions = {}, keys = {}, allResp = {}, repAns = {}, reps = {}, state = {};
+let groups = {}, questions = {}, keys = {}, allResp = {}, repAns = {}, reps = {}, state = {}, doubles = {};
 let curQid = null, curList = LISTS.MAIN;
 let booted = false, timeOffset = 0;
 let autoLocked = null;      // 已經自動截止過的題目，避免重複寫入
@@ -65,6 +65,7 @@ function attach() {
   onValue(ref(db, PATH.responses),  s => { allResp = s.val() || {}; paint(); });
   onValue(ref(db, PATH.repAnswers), s => { repAns  = s.val() || {}; paint(); });
   onValue(ref(db, PATH.reps),       s => { reps    = s.val() || {}; paint(); });
+  onValue(ref(db, PATH.doubles),    s => { doubles = s.val() || {}; paint(); });
   onValue(ref(db, PATH.state),      s => { state   = s.val() || {}; syncFromState(); paint(); });
   onValue(ref(db, PATH.questions),  s => { questions = s.val() || {}; paintQuestionSelect(); paint(); });
   setInterval(tickTimer, 250);
@@ -135,6 +136,24 @@ $("#btn-lock").addEventListener("click", () => update(ref(db, PATH.state), { pha
 $("#btn-idle").addEventListener("click", () => update(ref(db, PATH.state), { phase: PHASE.IDLE }));
 $("#btn-reveal").addEventListener("click", doReveal);
 $("#btn-final").addEventListener("click", doFinal);
+// ---- 加倍轉盤 ----
+$("#btn-wheel").addEventListener("click", async () => {
+  const gl = toSortedList(groups);
+  if (!gl.length) { toast("後台還沒建立組別"); return; }
+  // 由主持人端抽，寫進 state 讓投影幕轉到同一格 —— 各個畫面才會一致
+  const pick = gl[Math.floor(Math.random() * gl.length)];
+  await update(ref(db, PATH.state), {
+    pendingDouble: pick.id,
+    wheel: { id: Date.now(), gid: pick.id }
+  });
+  toast("轉盤：" + pick.name + " 下一題 ×2");
+});
+
+$("#btn-wheel-clear").addEventListener("click", async () => {
+  await update(ref(db, PATH.state), { pendingDouble: null });
+  toast("已取消加倍");
+});
+
 $("#btn-prev").addEventListener("click", () => step(-1));
 $("#btn-next").addEventListener("click", () => step(+1));
 
@@ -151,7 +170,16 @@ async function openQuestion(qid) {
   if (!qid) { toast("請先選擇題目"); return; }
   curQid = qid;
   autoLocked = null;
+
+  // 轉盤抽到的加倍在這裡蓋章到這一題，然後就用掉了
+  const dbl = state.pendingDouble || null;
+  if (dbl) {
+    await set(ref(db, `${PATH.doubles}/${qid}`), dbl);
+    toast((groups[dbl]?.name || "某組") + " 這題 ×2");
+  }
+
   await update(ref(db, PATH.state), {
+    pendingDouble: null,
     qid,
     list: curList,
     phase: PHASE.OPEN,
@@ -181,7 +209,7 @@ async function doReveal() {
 async function doFinal() {
   if (!confirm("要結束遊戲並公布最終排行榜嗎？")) return;
 
-  const board = buildScoreboard(groups, questions, keys, allResp, repAns, state.revealed, LISTS.MAIN);
+  const board = buildScoreboard(groups, questions, keys, allResp, repAns, state.revealed, LISTS.MAIN, doubles);
   const best  = new Map(groupBestCategories(categoryMatrix(board)).map(b => [b.gid, b]));
 
   const rows = board.rows.map(r => {
@@ -205,6 +233,7 @@ $("#btn-clear-q").addEventListener("click", async () => {
     remove(ref(db, `${PATH.repAnswers}/${qid}`)),
     remove(ref(db, `${PATH.responses}/${qid}`)),
     remove(ref(db, `${PATH.stats}/${qid}`)),
+    remove(ref(db, `${PATH.doubles}/${qid}`)),
     remove(ref(db, `${PATH.state}/revealed/${qid}`))
   ]);
   await update(ref(db, PATH.state), { phase: PHASE.IDLE });
@@ -218,6 +247,7 @@ $("#btn-reset").addEventListener("click", async () => {
     remove(ref(db, PATH.responses)),
     remove(ref(db, PATH.repAnswers)),
     remove(ref(db, PATH.stats)),
+    remove(ref(db, PATH.doubles)),
     remove(ref(db, PATH.leaderboard)),
     set(ref(db, PATH.state), {
       phase: PHASE.IDLE, list: curList, qid: curQid || null, revealed: null,
@@ -282,10 +312,11 @@ function paint() {
   $("#live-membars").innerHTML = bars(q, mt, key, mt.total);
 
   // 排行榜
-  const board = buildScoreboard(groups, questions, keys, allResp, repAns, state.revealed, LISTS.MAIN);
+  const board = buildScoreboard(groups, questions, keys, allResp, repAns, state.revealed, LISTS.MAIN, doubles);
   $("#rank-rows").innerHTML = board.rows.length
     ? board.rows.map((r, i) => {
-        const s = scoreOne(key, repAns[qid]?.[r.gid], allResp[qid]?.[r.gid], ptsOf(q));
+        const thisPts = doubles[qid] === r.gid ? ptsOf(q) * 2 : ptsOf(q);
+        const s = scoreOne(key, repAns[qid]?.[r.gid], allResp[qid]?.[r.gid], thisPts);
         return `<tr class="${i === 0 && r.points ? "top1" : ""}">
           <td>${i + 1}</td>
           <td>${escapeHtml(r.name)}</td>
@@ -296,6 +327,13 @@ function paint() {
         </tr>`;
       }).join("")
     : `<tr><td colspan="6" style="color:#a9bce8;">後台尚未建立組別</td></tr>`;
+
+  const pending = state.pendingDouble;
+  const thisQ   = qid ? doubles[qid] : null;
+  const tag = $("#dbl-tag");
+  if (pending)      { tag.textContent = "下一題 ×2：" + (groups[pending]?.name || "?"); tag.className = "pill live"; }
+  else if (thisQ)   { tag.textContent = "本題 ×2："   + (groups[thisQ]?.name   || "?"); tag.className = "pill live"; }
+  else              { tag.textContent = "尚未抽"; tag.className = "pill"; }
 
   paintMatrix(board);
   paintReps(gl);

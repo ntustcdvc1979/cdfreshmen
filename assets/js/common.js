@@ -101,6 +101,7 @@ export function authErrorText(e) {
 //  /repAnswers/{qid}/{gid}        = { c, uid, t }                     ← 代表按下確認後的答案
 //  /responses/{qid}/{gid}/{uid}   = { c, t }                          ← 台下學員的作答
 //  /stats/{qid}                   = { A,B,C,D,total,key, rep:{…} }    ← 公布時由主持人寫入
+//  /doubles/{qid}                 = gid                              ← 轉盤抽中、該題分數 ×2 的組
 //  /leaderboard                   = { updatedAt, rows:[…] }
 export const PATH = {
   admins:     "admins",
@@ -113,6 +114,7 @@ export const PATH = {
   repAnswers: "repAnswers",
   responses:  "responses",
   stats:      "stats",
+  doubles:    "doubles",
   leaderboard:"leaderboard"
 };
 
@@ -273,6 +275,7 @@ export function questionsOf(questions, list) {
 //    代表答對                        → +配分
 //    台下學員答對率 >= 50%           → +配分
 //  代表沒送出（或送錯）不影響學員那一分 —— 學員過半照樣加分。
+//  被轉盤抽中的那一組，該題的配分再 ×2。
 //  配分預設 1，可以逐題調整（後台的「配分」欄位）。
 //  排行榜就比總分。DEMO 題庫不計分。
 
@@ -346,14 +349,17 @@ export function scoreOne(key, repAnswer, memberByGroup, pts = DEFAULT_POINTS) {
  *   每個 row：{ gid, name, points, max, repCorrect, repAnswered,
  *              memberBonus, memberCorrect, memberAnswered, byCat:{catId:{points,max}} }
  */
-export function buildScoreboard(groups, questions, answerKeys, responses, repAnswers, revealed, list = LISTS.MAIN) {
+export const DOUBLE_MULTIPLIER = 2;
+
+export function buildScoreboard(groups, questions, answerKeys, responses, repAnswers, revealed,
+                                list = LISTS.MAIN, doubles = null) {
   const qs = questionsOf(questions, list)
     .filter(q => revealed?.[q.id] && answerKeys?.[q.id]);
 
   const usedCats = new Set();
   const rows = toSortedList(groups).map(g => ({
     gid: g.id, name: g.name,
-    points: 0, max: qs.reduce((n, q) => n + ptsOf(q) * 2, 0),
+    points: 0, max: 0,
     repCorrect: 0, repAnswered: 0,
     memberBonus: 0, memberCorrect: 0, memberAnswered: 0,
     byCat: {}
@@ -364,10 +370,16 @@ export function buildScoreboard(groups, questions, answerKeys, responses, repAns
     const cat = categoryOf(q.cat).id;
     usedCats.add(cat);
 
-    const pts = ptsOf(q);
+    const basePts = ptsOf(q);
+    const doubledGid = doubles?.[q.id] || null;
+
     for (const row of rows) {
+      // 被轉盤抽中的那一組，這一題的配分加倍（滿分也跟著加倍，得分率才不會爆表）
+      const pts = row.gid === doubledGid ? basePts * DOUBLE_MULTIPLIER : basePts;
+
       row.byCat[cat] ??= { points: 0, max: 0 };
       row.byCat[cat].max += pts * 2;
+      row.max += pts * 2;
 
       const s = scoreOne(key, repAnswers?.[q.id]?.[row.gid], responses?.[q.id]?.[row.gid], pts);
       if (s.repChoice) row.repAnswered++;

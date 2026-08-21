@@ -25,6 +25,7 @@ let groups    = {};
 let questions = {};
 let state     = null;
 let reps      = {};      // /reps —— 哪些組已經有代表了
+let doubles   = {};      // /doubles —— 哪一題哪一組分數加倍
 let timeOffset = 0;      // 伺服器時鐘差
 
 let myGroup = localStorage.getItem("cdf_group") || "";
@@ -84,6 +85,7 @@ function attach() {
   onValue(ref(db, PATH.groups),    s => { groups    = s.val() || {}; paintGroupSelect(); render(); }, fail);
   onValue(ref(db, PATH.questions), s => { questions = s.val() || {}; render(); }, fail);
   onValue(ref(db, PATH.reps),      s => { reps = s.val() || {}; repsLoaded = true; paintRolePicker(); render(); }, fail);
+  onValue(ref(db, PATH.doubles),   s => { doubles   = s.val() || {}; render(); }, fail);
   onValue(ref(db, PATH.state),     s => { state     = s.val() || {}; render(); }, fail);
 }
 
@@ -218,6 +220,7 @@ function render() {
   $("#wait-msg").textContent = phase === PHASE.IDLE
     ? "請把手機拿好，題目馬上就來 ✦"
     : "等待主持人操作…";
+  show($("#wait-double"), state.pendingDouble === myGroup);
   goto("wait");
 }
 
@@ -245,6 +248,7 @@ function renderQuestion(qid, q, phase) {
     const pts = ptsOf(q);
     $("#q-pts").textContent = "+" + pts;
     $("#q-pts").style.display = pts !== 1 ? "" : "none";
+    $("#q-x2").style.display = doubles[qid] === myGroup ? "" : "none";
 
     const box = $("#opts");
     box.innerHTML = "";
@@ -419,13 +423,15 @@ function renderReveal(qid, q) {
   const repaint = () => {
     $("#r-letter").textContent = key || "—";
 
-    const s = scoreOne(key, repAns, members, ptsOf(q));
+    const s = scoreOne(key, repAns, members,
+      doubles[qid] === myGroup ? ptsOf(q) * 2 : ptsOf(q));
     const v = $("#r-verdict");
     if (!repAns)          { v.className = "verdict";     v.textContent = "你們這組代表沒有作答"; }
     else if (s.repOk)     { v.className = "verdict ok";  v.textContent = `代表答對了！選 ${s.repChoice}`; }
     else                  { v.className = "verdict bad"; v.textContent = `代表選了 ${s.repChoice}`; }
 
-    $("#r-points").textContent = `本題 +${s.points} 分`;
+    $("#r-points").textContent = `本題 +${s.points} 分`
+      + (doubles[qid] === myGroup ? "（轉盤 ×2）" : "");
 
     const t = s.memberTally;
     $("#r-bars").innerHTML = LETTERS

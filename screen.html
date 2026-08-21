@@ -259,10 +259,13 @@
     animation: theme-in .55s backwards cubic-bezier(.2,1.4,.4,1);
     min-width: 0; min-height: 0;
   }
+  /* 八邊形去背：把四個角切掉，深藍底就不會露出來。
+     用 clip-path 而不是做透明 PNG —— 同樣效果，檔案小十倍。 */
   .theme img {
     max-width: 100%; max-height: 100%; object-fit: contain;
-    border-radius: 1.2vh;
-    filter: drop-shadow(0 0 2vh rgba(0,0,0,.5));
+    clip-path: polygon(4.8% 0, 95.2% 0, 100% 7%, 100% 93%,
+                       95.2% 100%, 4.8% 100%, 0 93%, 0 7%);
+    filter: drop-shadow(0 0 1.6vh rgba(0,0,0,.55));
   }
   .theme .fallback {
     font-size: 3.4vh; font-weight: 900; color: #fff; text-align: center;
@@ -348,6 +351,72 @@
     animation: fall linear forwards;
   }
   @keyframes fall { to { transform: translateY(112vh) rotate(760deg); opacity: .15; } }
+
+  /* ============================================================
+     加倍轉盤
+     ============================================================ */
+  .wheel-overlay {
+    position: fixed; inset: 0; z-index: 60;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2vh;
+    background: radial-gradient(circle at 50% 45%, rgba(6,18,90,.94), rgba(0,2,26,.97));
+    backdrop-filter: blur(4px);
+    animation: wheel-in .35s ease;
+  }
+  @keyframes wheel-in { from { opacity: 0; } }
+
+  .wheel-overlay h2 { font-size: 5.4vh; margin: 0; }
+  .wheel-stage { position: relative; width: 62vh; height: 62vh; flex: 0 0 auto; }
+  .wheel-stage svg { width: 100%; height: 100%; display: block; }
+  .wheel-spin { transform-origin: 50% 50%; }
+
+  /* 指針（12 點鐘方向） */
+  .wheel-ptr {
+    position: absolute; top: -1.4vh; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 2.2vh solid transparent;
+    border-right: 2.2vh solid transparent;
+    border-top: 4.4vh solid var(--gold);
+    filter: drop-shadow(0 .4vh .8vh rgba(0,0,0,.6));
+    z-index: 2;
+  }
+  .wheel-hub {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 11vh; height: 11vh; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 3.4vh; font-weight: 900; color: #6b3b00;
+    background: linear-gradient(180deg, #fff2b8, var(--gold) 55%, #dc9400);
+    box-shadow: 0 0 3vh rgba(255,200,31,.8), inset 0 0 1.4vh rgba(255,255,255,.5);
+    z-index: 2;
+  }
+
+  .wheel-result {
+    font-size: 5vh; font-weight: 900; text-align: center; min-height: 7vh;
+    display: flex; align-items: center; gap: 1.4vw;
+  }
+  .wheel-result .who {
+    background: linear-gradient(180deg, #fff6cf, var(--gold) 45%, #cf8b00);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 2vh rgba(255,200,31,.8));
+  }
+  .wheel-result .x2 {
+    font-size: 6vh; color: #fff;
+    padding: .6vh 2vw; border-radius: 999px;
+    background: linear-gradient(180deg, #ff7a90, #cc1f3d);
+    box-shadow: 0 0 3vh rgba(255,84,112,.8);
+    animation: x2-pop .5s cubic-bezier(.2,1.6,.4,1);
+  }
+  @keyframes x2-pop { from { transform: scale(.4); } to { transform: scale(1); } }
+  .wheel-result.pending { color: var(--txt-dim); font-size: 3vh; }
+
+  /* 出題時標示這一題被加倍的組 */
+  .cellbox.doubled { border-color: #ff5470; box-shadow: 0 0 2.6vh rgba(255,84,112,.7); }
+  .cellbox .x2tag {
+    flex: 0 0 auto;
+    font-size: calc(var(--cell-name, 2.4vh) * .9); font-weight: 900; color: #fff;
+    padding: .1vh .5vw; border-radius: 999px;
+    background: linear-gradient(180deg, #ff7a90, #cc1f3d);
+  }
 
   /* ---------- 音效解鎖 ---------- */
   #sound-gate {
