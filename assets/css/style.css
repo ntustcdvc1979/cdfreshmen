@@ -176,6 +176,21 @@ code {
 }
 @keyframes throb { 0%,100% { transform: scale(1); } 50% { transform: scale(1.13); } }
 
+/* 配分徽章：只有不是 +1 的題目才會出現 */
+.pts-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 13px;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+  color: #4a2c00;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff2b8, var(--gold) 55%, #dc9400);
+  box-shadow: 0 0 16px rgba(255,200,31,.65);
+}
+
 /* ---------- 題號徽章 ---------- */
 .qbadge {
   display: inline-flex;

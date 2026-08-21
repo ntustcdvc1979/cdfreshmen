@@ -2,19 +2,21 @@
 //  投影統計頁 —— 主持人切到瀏覽器全螢幕給觀眾看
 //  需要主持人身分（原始作答只有 /admins 名單讀得到）。
 //  在同一個瀏覽器開過 host.html 登入後，這頁會自動沿用登入狀態。
+//
+//  鍵盤：→ / ← 翻頁，空白鍵在最終畫面推進頒獎。
 // ============================================================
 
 import {
   db, auth, ref, onValue, onAuthStateChanged,
-  PATH, PHASE, LISTS, LETTERS, DEFAULT_LIMIT_SEC,
-  categoryOf, questionsOf, tallyAllMembers, secondsLeft, isHost,
+  PATH, PHASE, LISTS, LETTERS, DEFAULT_LIMIT_SEC, CATEGORIES,
+  categoryOf, questionsOf, tallyAllMembers, secondsLeft, isHost, ptsOf,
   gridColumns, buildScoreboard, categoryMatrix, groupBestCategories, columnWinners,
   $, show, escapeHtml, toSortedList
 } from "./common.js";
 
 import * as snd from "./sounds.js";
 
-let groups = {}, questions = {}, keys = {}, allResp = {}, repAns = {}, state = {}, board = null;
+let groups = {}, questions = {}, keys = {}, allResp = {}, repAns = {}, reps = {}, state = {}, board = null, intro = {};
 let ready = false, timeOffset = 0;
 
 const stage = $("#stage");
@@ -23,10 +25,14 @@ const badge = $("#s-badge");
 const foot  = $("#s-phase");
 const tip   = $("#s-tip");
 
-// 結束畫面在「排行榜」與「類別分析」之間切換
-let finalView = "rank";
-// 公布階段的頁序：答案＋說明 →（整頁大圖，有填才有）→ 全場作答分布
-let revealPage = 0;
+// 每 N 題插一頁戰況（最後一題不插，因為接著就是完整排行榜）
+const STANDINGS_EVERY = 5;
+const STANDINGS_TOP   = 5;
+const PODIUM_TOP      = 3;
+
+let introPage  = 0;   // 開場：0 六大主題 / 1 規則 / 2 QR + 代表就位
+let revealPage = 0;   // 公布：答案與說明 →（補充大圖）→（目前戰況）→ 全場分布
+let podiumStep = 0;   // 頒獎：0 還沒開始 → 3 全部揭曉 → 4 類別分析
 
 // ------------------------------------------------------------
 //  音效解鎖
@@ -42,26 +48,14 @@ $("#btn-nosound").addEventListener("click", e => {
 });
 
 // ------------------------------------------------------------
-//  操作：空白鍵切換最終畫面
-// ------------------------------------------------------------
-function toggleFinalView() {
-  if ((state.phase || "") !== PHASE.FINAL) return;
-  finalView = finalView === "rank" ? "matrix" : "rank";
-  paint();
-}
-addEventListener("keydown", e => {
-  if ([" ", "ArrowRight", "ArrowLeft", "Enter"].includes(e.key)) { e.preventDefault(); toggleFinalView(); }
-});
-
-// ------------------------------------------------------------
 //  登入與資料
 // ------------------------------------------------------------
 onAuthStateChanged(auth, async user => {
   const ok = await isHost(user);
   if (!ok) {
     body.innerHTML = `<div class="card center stack" style="max-width:60vw; margin:0 auto;">
-      <h2 class="title-gold" style="font-size:4vh; margin:0;">尚未登入</h2>
-      <p class="hint" style="font-size:2.2vh;">請先在同一個瀏覽器開啟
+      <h2 class="title-gold" style="font-size:4.4vh; margin:0;">尚未登入</h2>
+      <p class="hint" style="font-size:2.4vh;">請先在同一個瀏覽器開啟
         <a href="host.html" style="color:var(--gold-lt)">主持人控制台</a> 登入，再回到這一頁。</p>
     </div>`;
     return;
@@ -70,24 +64,25 @@ onAuthStateChanged(auth, async user => {
   ready = true;
   onValue(ref(db, "/.info/serverTimeOffset"), s => { timeOffset = s.val() || 0; });
   onValue(ref(db, PATH.groups),      s => { groups    = s.val() || {}; paint(); });
+  onValue(ref(db, PATH.intro),       s => { intro     = s.val() || {}; paint(); });
   onValue(ref(db, PATH.questions),   s => { questions = s.val() || {}; paint(); });
   onValue(ref(db, PATH.answerKey),   s => { keys      = s.val() || {}; paint(); });
   onValue(ref(db, PATH.responses),   s => { allResp   = s.val() || {}; paint(); });
   onValue(ref(db, PATH.leaderboard), s => { board     = s.val();       paint(); });
+  onValue(ref(db, PATH.reps),        s => { reps      = s.val() || {}; paint(); });
   onValue(ref(db, PATH.repAnswers),  s => { repAns    = s.val() || {}; onRepAnswers(); paint(); });
   onValue(ref(db, PATH.state),       s => { state     = s.val() || {}; onStateChange(); paint(); });
 });
 
 // ------------------------------------------------------------
-//  階段變化 → 音效
+//  階段變化 → 音效與頁碼重置
 // ------------------------------------------------------------
 let lastPhase = null, lastQid = null;
 
 function onStateChange() {
   const phase = state.phase || PHASE.IDLE;
   const qid   = state.qid || null;
-  const changed = phase !== lastPhase || qid !== lastQid;
-  if (!changed) return;
+  if (phase === lastPhase && qid === lastQid) return;
 
   if (phase === PHASE.OPEN) {
     snd.stopBgm();
@@ -99,19 +94,19 @@ function onStateChange() {
     stage.classList.remove("tense", "shake");
     if (phase === PHASE.LOCKED && lastPhase === PHASE.OPEN) snd.timeUp();
     if (phase === PHASE.REVEAL) snd.fanfare();
-    if (phase === PHASE.FINAL && lastPhase !== PHASE.FINAL) { finalView = "rank"; snd.victory(); }
+    if (phase === PHASE.FINAL && lastPhase !== PHASE.FINAL) podiumStep = 0;
   }
 
   if (qid !== lastQid) {
     seenReps = new Set(Object.keys(repAns[qid] || {}));
-    revealPage = 0;                        // 換題就回到答案頁
+    revealPage = 0;
   }
   if (phase === PHASE.REVEAL && lastPhase !== PHASE.REVEAL) revealPage = 0;
+
   lastPhase = phase;
   lastQid = qid;
 }
 
-/** 有新的組別按下確認 → 確認音效 */
 let seenReps = new Set();
 function onRepAnswers() {
   const qid = state.qid;
@@ -119,7 +114,44 @@ function onRepAnswers() {
   const now = Object.keys(repAns[qid] || {});
   const fresh = now.filter(g => !seenReps.has(g));
   seenReps = new Set(now);
-  if (fresh.length && (state.phase === PHASE.OPEN)) snd.confirmed();
+  if (fresh.length && state.phase === PHASE.OPEN) snd.confirmed();
+}
+
+// ------------------------------------------------------------
+//  鍵盤
+// ------------------------------------------------------------
+addEventListener("keydown", e => {
+  const phase = state.phase || PHASE.IDLE;
+
+  if (phase === PHASE.FINAL) {
+    if ([" ", "ArrowRight", "Enter"].includes(e.key)) { e.preventDefault(); stepPodium(+1); }
+    if (e.key === "ArrowLeft")                        { e.preventDefault(); stepPodium(-1); }
+    return;
+  }
+
+  if (phase === PHASE.IDLE) {
+    if (e.key === "ArrowRight") { e.preventDefault(); introPage = Math.min(2, introPage + 1); paint(); }
+    if (e.key === "ArrowLeft")  { e.preventDefault(); introPage = Math.max(0, introPage - 1); paint(); }
+    return;
+  }
+
+  if (phase === PHASE.REVEAL) {
+    const q = state.qid ? questions[state.qid] : null;
+    if (!q) return;
+    const last = revealPages(q).length - 1;
+    if (e.key === "ArrowRight") { e.preventDefault(); revealPage = Math.min(last, revealPage + 1); paint(); }
+    if (e.key === "ArrowLeft")  { e.preventDefault(); revealPage = Math.max(0, revealPage - 1); paint(); }
+  }
+});
+
+function stepPodium(dir) {
+  const next = Math.max(0, Math.min(PODIUM_TOP + 1, podiumStep + dir));
+  if (next === podiumStep) return;
+  podiumStep = next;
+  if (dir > 0 && podiumStep >= 1 && podiumStep <= PODIUM_TOP) {
+    podiumStep === PODIUM_TOP ? snd.victory() : snd.fanfare();
+  }
+  paint();
 }
 
 // ------------------------------------------------------------
@@ -142,10 +174,7 @@ function startTicker() {
     stage.classList.toggle("shake", left <= 5 && left > 0);
   }, 200);
 }
-
-function stopTicker() {
-  if (ticker) { clearInterval(ticker); ticker = null; }
-}
+function stopTicker() { if (ticker) { clearInterval(ticker); ticker = null; } }
 
 function paintCountdown(left) {
   const el = $("#s-countdown");
@@ -155,7 +184,7 @@ function paintCountdown(left) {
 }
 
 // ------------------------------------------------------------
-//  版面
+//  版面工具
 // ------------------------------------------------------------
 function fitToBox(el, box, prop, startVh, minVh = 0.8) {
   let vh = startVh;
@@ -171,13 +200,46 @@ const activeList = () => state.list === LISTS.DEMO ? LISTS.DEMO : LISTS.MAIN;
 const qList  = () => questionsOf(questions, activeList());
 const qIndex = qid => qList().findIndex(q => q.id === qid);
 
+/** 這一題公布後要不要插一頁戰況：每 5 題一次，最後一題不插 */
+function showsStandings(qid) {
+  if (activeList() !== LISTS.MAIN) return false;
+  const list = qList();
+  const i = list.findIndex(q => q.id === qid);
+  if (i < 0) return false;
+  const isLast = i === list.length - 1;
+  return !isLast && (i + 1) % STANDINGS_EVERY === 0;
+}
+
+function revealPages(q) {
+  const pages = ["answer"];
+  if ((q?.exImgFull || "").trim()) pages.push("fullimg");
+  if (showsStandings(q?.id ?? state.qid)) pages.push("standings");
+  pages.push("dist");
+  return pages;
+}
+
+const PAGE_NAME = {
+  answer:    "答案與說明",
+  fullimg:   "補充大圖",
+  standings: "目前戰況",
+  dist:      "全場作答分布"
+};
+const INTRO_NAME = ["六大主題", "遊戲規則", "掃碼進場"];
+
+function scoreboardNow() {
+  return buildScoreboard(groups, questions, keys, allResp, repAns, state.revealed, LISTS.MAIN);
+}
+
+// ------------------------------------------------------------
+//  主分派
+// ------------------------------------------------------------
 function paint() {
   if (!ready) return;
   const phase = state.phase || PHASE.IDLE;
   const qid   = state.qid || null;
   const q     = qid ? questions[qid] : null;
 
-  // 待機與最終排行榜跟「某一題」無關，題號與類別整個藏起來
+  // 待機與最終排行榜跟「某一題」無關，題號、類別、配分整個藏起來
   const onQuestion = !!q && phase !== PHASE.IDLE && phase !== PHASE.FINAL;
 
   badge.innerHTML = onQuestion ? `第 <b>${qIndex(qid) + 1}</b> 題` : "";
@@ -188,23 +250,177 @@ function paint() {
   $("#s-cat").style.setProperty("--cat", cat.color);
   $("#s-cat").style.display = onQuestion ? "" : "none";
 
+  // 配分只有不是 +1 的時候才秀出來
+  const pts = ptsOf(q);
+  const showPts = onQuestion && pts !== 1;
+  $("#s-pts").textContent = "+" + pts;
+  $("#s-pts").style.display = showPts ? "" : "none";
+
   tip.textContent = "";
+  stage.querySelector(".confetti")?.remove();
 
   if (phase === PHASE.FINAL)                                 return paintFinal();
-  if (phase === PHASE.REVEAL && q)                           return repaintReveal();
+  if (phase === PHASE.REVEAL && q)                           return paintRevealPage(qid, q);
   if ((phase === PHASE.OPEN || phase === PHASE.LOCKED) && q)  return paintPlay(qid, q, phase);
-  return paintIdle();
+  return paintIntro();
 }
 
-function paintIdle() {
-  foot.textContent = "待機中";
-  body.innerHTML = `<div class="center stack">
-    <img src="assets/img/hero.jpg" alt="大學星攻略" style="width:58vh; max-width:66vw; border-radius:1.4vh; margin:0 auto; box-shadow:0 0 0 .3vh rgba(255,200,31,.4), 0 2vh 6vh rgba(0,0,0,.6);">
-    <p class="hint pulse" style="font-size:2.6vh; margin-top:2vh;">請用手機掃描 QR Code，選擇組別與身分 ✦</p>
-  </div>`;
+// ============================================================
+//  開場三頁
+// ============================================================
+function paintIntro() {
+  foot.textContent = "開場";
+  const prev = introPage > 0 ? "← " + INTRO_NAME[introPage - 1] : "";
+  const next = introPage < 2 ? INTRO_NAME[introPage + 1] + " →" : "";
+  tip.textContent = [prev, next].filter(Boolean).join("　　");
+
+  if (introPage === 0) return paintThemes();
+  if (introPage === 1) return paintRules();
+  return paintJoin();
 }
 
-/** 題目＋倒數＋各組代表答案格 */
+/** 第一頁：六大主題 */
+function paintThemes() {
+  body.innerHTML = `
+    <h2 class="title-gold intro-title">★ 六大主題 ★</h2>
+    <div class="themes">
+      ${CATEGORIES.map((c, i) => `
+        <div class="theme" style="--cat:${c.color}; animation-delay:${(i * 0.09).toFixed(2)}s">
+          <span class="num">${i + 1}</span>
+          <span class="nm">${escapeHtml(c.name)}</span>
+        </div>`).join("")}
+    </div>`;
+}
+
+/** 第二頁：規則。後台沒放圖就用內建的流程示意圖。 */
+function paintRules() {
+  const img = (intro.rulesImg || "").trim();
+  body.innerHTML = `
+    <h2 class="title-gold intro-title">★ 遊戲規則 ★</h2>
+    <div class="rules">
+      <ol>
+        <li>每組推派 <b>一位上台代表</b>，其餘是 <b>台下學員</b>。</li>
+        <li>題目出現後開始 <b>倒數</b>，台下學員在手機上選 A／B／C／D。</li>
+        <li>代表看得到自己這組的 <b>即時選擇比例</b>，再決定最終答案。</li>
+        <li>代表按下 <b>確認送出</b> —— 送出後不能更改，並立刻顯示在螢幕上。</li>
+        <li>代表答對 <b>+1 分</b>；台下學員答對率 <b>過半再 +1 分</b>。</li>
+        <li>分數高的題目會在題號旁標示 <b>+N</b>，請注意把握。</li>
+      </ol>
+      <div class="pic">${img
+        ? `<img src="${escapeHtml(img)}" alt="規則說明圖"
+             onerror="this.replaceWith(document.createRange().createContextualFragment(window.__ruleSvg))">`
+        : window.__ruleSvg}</div>
+    </div>`;
+}
+
+/** 第三頁：QR Code + 各組代表就位狀況 */
+function paintJoin() {
+  const gl = toSortedList(groups);
+  const ready_ = gl.filter(g => reps[g.id]).length;
+
+  body.innerHTML = `
+    <div class="joinpage">
+      <div class="qrside">
+        <h3 class="title-gold" style="margin:0;">掃碼進場</h3>
+        <div class="qrbox"><img id="s-qr" alt="玩家端 QR Code"></div>
+        <div class="url">${escapeHtml(playerUrl)}</div>
+      </div>
+      <div class="repside">
+        <h3 class="title-gold">各組代表就位　<span style="color:var(--gold-lt)">${ready_} / ${gl.length}</span></h3>
+        <div class="repgrid" id="s-repgrid"></div>
+      </div>
+    </div>`;
+
+  paintQr();
+
+  const el = $("#s-repgrid");
+  const cols = gl.length ? gridColumns(gl.length) : 1;
+  const rows = Math.max(1, Math.ceil(gl.length / cols));
+  el.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+  el.style.gridTemplateRows    = `repeat(${rows}, minmax(0, 1fr))`;
+  el.innerHTML = gl.map(g => `
+    <div class="repcard ${reps[g.id] ? "ready" : ""}">
+      <span class="nm">${escapeHtml(g.name)}</span>
+      <span class="st">${reps[g.id] ? "✓ 已就位" : "等待中"}</span>
+    </div>`).join("") || `<p class="hint" style="font-size:2.4vh;">後台尚未建立組別</p>`;
+
+  const cellH = el.clientHeight / rows, cellW = el.clientWidth / cols;
+  el.style.setProperty("--rep-nm", Math.max(12, Math.min(cellH * 0.34, cellW * 0.16, 34)).toFixed(1) + "px");
+  el.style.setProperty("--rep-st", Math.max(10, Math.min(cellH * 0.24, cellW * 0.12, 24)).toFixed(1) + "px");
+}
+
+const playerUrl = new URL("index.html", location.href).href;
+let qrDataUrl = null;
+
+async function paintQr() {
+  const img = $("#s-qr");
+  if (!img) return;
+  if (qrDataUrl) { img.src = qrDataUrl; return; }
+  try {
+    if (!window.qrcode) {
+      await new Promise((ok, no) => {
+        const s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js";
+        s.onload = ok; s.onerror = no;
+        document.head.appendChild(s);
+      });
+    }
+    const qr = window.qrcode(0, "M");
+    qr.addData(playerUrl);
+    qr.make();
+    qrDataUrl = qr.createDataURL(10, 4);
+    const now = $("#s-qr");
+    if (now) now.src = qrDataUrl;
+  } catch {
+    const box = $("#s-qr")?.parentElement;
+    if (box) box.innerHTML = `<p style="color:#333; font-size:2vh; padding:2vh;">QR 產生器載不出來<br>請直接把網址給學員</p>`;
+  }
+}
+
+// 內建的規則示意圖：後台沒放自己的圖時就用這張
+window.__ruleSvg = `
+<svg viewBox="0 0 420 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="遊戲流程示意">
+  <defs>
+    <linearGradient id="rg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a5cff"/><stop offset="1" stop-color="#0a1b7a"/>
+    </linearGradient>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#ffc81f"/>
+    </marker>
+  </defs>
+
+  <g font-family="Noto Sans TC, sans-serif" text-anchor="middle">
+    <rect x="14" y="18" width="170" height="86" rx="12" fill="url(#rg)" stroke="#35a8ff" stroke-width="2.5"/>
+    <text x="99" y="48" fill="#fff" font-size="19" font-weight="700">📱 台下學員</text>
+    <text x="99" y="74" fill="#a9bce8" font-size="14">各自選 A B C D</text>
+
+    <rect x="236" y="18" width="170" height="86" rx="12" fill="url(#rg)" stroke="#ffc81f" stroke-width="2.5"/>
+    <text x="321" y="48" fill="#fff" font-size="19" font-weight="700">🎤 上台代表</text>
+    <text x="321" y="74" fill="#ffe680" font-size="14">看比例、下決定</text>
+
+    <line x1="188" y1="61" x2="230" y2="61" stroke="#ffc81f" stroke-width="3" marker-end="url(#ar)"/>
+    <text x="209" y="50" fill="#ffc81f" font-size="11">比例</text>
+
+    <rect x="125" y="132" width="170" height="60" rx="12" fill="#0d2a14" stroke="#2fd96b" stroke-width="2.5"/>
+    <text x="210" y="169" fill="#7bffab" font-size="19" font-weight="700">✓ 確認送出</text>
+    <line x1="321" y1="108" x2="255" y2="128" stroke="#ffc81f" stroke-width="3" marker-end="url(#ar)"/>
+
+    <rect x="14" y="220" width="180" height="64" rx="12" fill="#241a02" stroke="#ffc81f" stroke-width="2.5"/>
+    <text x="104" y="246" fill="#ffe680" font-size="16" font-weight="700">代表答對</text>
+    <text x="104" y="270" fill="#ffc81f" font-size="20" font-weight="900">+1</text>
+
+    <rect x="226" y="220" width="180" height="64" rx="12" fill="#241a02" stroke="#ffc81f" stroke-width="2.5"/>
+    <text x="316" y="246" fill="#ffe680" font-size="16" font-weight="700">學員答對過半</text>
+    <text x="316" y="270" fill="#ffc81f" font-size="20" font-weight="900">+1</text>
+
+    <line x1="180" y1="196" x2="120" y2="214" stroke="#ffc81f" stroke-width="3" marker-end="url(#ar)"/>
+    <line x1="240" y1="196" x2="300" y2="214" stroke="#ffc81f" stroke-width="3" marker-end="url(#ar)"/>
+  </g>
+</svg>`;
+
+// ============================================================
+//  出題中
+// ============================================================
 function paintPlay(qid, q, phase) {
   const locked = phase === PHASE.LOCKED;
   foot.textContent = locked ? "已截止作答，準備公布" : "開放作答中";
@@ -214,7 +430,7 @@ function paintPlay(qid, q, phase) {
   body.innerHTML = `
     <div style="display:flex; gap:2.4vw; align-items:center; flex:0 0 auto;">
       <div style="flex:1 1 auto; min-width:0;">
-        <div class="big-q" style="font-size:3.1vh; padding:2vh 2vw;">${escapeHtml(q.text || "")}</div>
+        <div class="big-q" style="font-size:3.6vh; padding:2vh 2vw;">${escapeHtml(q.text || "")}</div>
         <div class="opt-row" style="margin-top:1.4vh;">
           ${LETTERS.filter(L => q[L.toLowerCase()]).map(L =>
             `<div class="opt-mini"><span class="k">${L}</span><span>${escapeHtml(q[L.toLowerCase()])}</span></div>`
@@ -229,10 +445,6 @@ function paintPlay(qid, q, phase) {
   paintGrid(qid, false);
 }
 
-/**
- * 各組代表的答案格。
- * showRepLetters=false 時，鎖定前只顯示已確認／未確認，公布後才翻出字母。
- */
 function paintGrid(qid, revealMode) {
   const el = $("#s-grid");
   if (!el) return;
@@ -251,7 +463,6 @@ function paintGrid(qid, revealMode) {
     const c = LETTERS.includes(a?.c) ? a.c : null;
     const cls = ["cellbox"];
     let mark = "";
-
     if (c) {
       cls.push("done");
       if (revealMode && key) {
@@ -260,9 +471,8 @@ function paintGrid(qid, revealMode) {
       }
     }
     const inner = c
-      ? (showLetters ? `<span class="glet">${c}</span>` : `<span class="glet">✓</span>`)
+      ? `<span class="glet">${showLetters ? c : "✓"}</span>`
       : `<span class="waiting">···</span>`;
-
     return `<div class="${cls.join(" ")}">
       ${mark ? `<span class="mark">${mark}</span>` : ""}
       ${inner}
@@ -275,18 +485,32 @@ function paintGrid(qid, revealMode) {
   const cellH = el.clientHeight / rows;
   const cellW = el.clientWidth  / cols;
   el.style.setProperty("--cell-let",
-    Math.max(14, Math.min(cellH * 0.5, cellW * 0.42, 120)).toFixed(1) + "px");
+    Math.max(14, Math.min(cellH * 0.5, cellW * 0.42, 130)).toFixed(1) + "px");
   el.style.setProperty("--cell-name",
-    Math.max(9,  Math.min(cellH * 0.2, cellW * 0.16, 24)).toFixed(1) + "px");
+    Math.max(10, Math.min(cellH * 0.2, cellW * 0.16, 28)).toFixed(1) + "px");
 
-  const done = Object.keys(repAns[qid] || {}).length;
-  if (!revealMode) tip.textContent = `${done} / ${gl.length} 組已確認`;
+  if (!revealMode) {
+    const done = Object.keys(repAns[qid] || {}).length;
+    tip.textContent = `${done} / ${gl.length} 組已確認`;
+  }
 }
 
-/**
- * 公布答案：正解大字與說明「同時」出現，下面接各組對錯格。
- * 全場作答分布放在第二頁（按 →），因為三樣一起塞進 16:9 會擠到看不清楚。
- */
+// ============================================================
+//  公布階段
+// ============================================================
+function paintRevealPage(qid, q) {
+  const pages = revealPages(q);
+  revealPage = Math.min(revealPage, pages.length - 1);
+
+  ({ answer: paintReveal, fullimg: paintFullImage, standings: paintStandings, dist: paintDistribution })
+    [pages[revealPage]](qid, q);
+
+  const prev = revealPage > 0 ? "← " + PAGE_NAME[pages[revealPage - 1]] : "";
+  const next = revealPage < pages.length - 1 ? PAGE_NAME[pages[revealPage + 1]] + " →" : "";
+  tip.textContent = [prev, next].filter(Boolean).join("　　");
+}
+
+/** 正解大字與說明同時出現，下面接各組對錯格 */
 function paintReveal(qid, q) {
   foot.textContent = "已公布答案";
 
@@ -297,11 +521,11 @@ function paintReveal(qid, q) {
   body.innerHTML = `
     <div class="reveal-top">
       <div class="reveal-ans">
-        <div class="title-gold" style="font-size:2.4vh;">🎉 正確答案 🎉</div>
+        <div class="title-gold" style="font-size:2.8vh;">🎉 正確答案 🎉</div>
         <div class="reveal-letter">${key || "—"}</div>
       </div>
       <div class="reveal-ex">
-        <h3 class="title-gold" style="font-size:2.6vh; margin:0 0 1vh;">💡 說明</h3>
+        <h3 class="title-gold" style="font-size:3vh; margin:0 0 1vh;">💡 說明</h3>
         <div class="explain ${hasImg ? "" : "noimg"}">
           <div class="txt" id="s-extext">${text ? escapeHtml(text) : "（這一題後台還沒有填說明）"}</div>
           <div class="pic">${hasImg ? `<img src="${escapeHtml(q.exImg)}" alt="說明圖片"
@@ -312,21 +536,19 @@ function paintReveal(qid, q) {
     <div class="grid" id="s-grid" style="flex:0 0 26vh;"></div>`;
 
   const t = $("#s-extext");
-  fitToBox(t, t, "font-size", 2.6, 1.2);
+  fitToBox(t, t, "font-size", 3, 1.4);
   paintGrid(qid, true);
 }
 
-/** 補充大圖：整頁只放一張圖，適合流程圖、對照表這種要看細節的東西 */
 function paintFullImage(qid, q) {
   foot.textContent = "補充說明";
   body.innerHTML = `
     <div class="fullimg">
       <img src="${escapeHtml(q.exImgFull)}" alt="補充說明大圖"
-           onerror="this.parentElement.innerHTML='<p class=&quot;hint&quot; style=&quot;font-size:2.4vh&quot;>圖片載不出來，請確認後台填的網址</p>'">
+           onerror="this.parentElement.innerHTML='<p class=&quot;hint&quot; style=&quot;font-size:2.6vh&quot;>圖片載不出來，請確認後台填的網址</p>'">
     </div>`;
 }
 
-/** 全場台下學員的作答分布 */
 function paintDistribution(qid, q) {
   foot.textContent = "全場作答分布";
 
@@ -334,7 +556,7 @@ function paintDistribution(qid, q) {
   const t   = tallyAllMembers(allResp[qid]);
 
   body.innerHTML = `
-    <div class="big-q" style="font-size:2.6vh; padding:1.8vh 2vw; flex:0 0 auto;">${escapeHtml(q.text || "")}</div>
+    <div class="big-q" style="font-size:3.2vh; padding:1.8vh 2vw; flex:0 0 auto;">${escapeHtml(q.text || "")}</div>
     <div class="bars screen-bars" style="flex:0 0 auto; margin-top:1.6vh;">
       ${LETTERS.filter(L => q[L.toLowerCase()]).map(L => {
         const n = t[L], pct = t.total ? Math.round(n / t.total * 100) : 0;
@@ -346,78 +568,30 @@ function paintDistribution(qid, q) {
         </div>`;
       }).join("")}
     </div>
-    <p class="hint center" style="font-size:1.9vh; margin:1.4vh 0 0;">
+    <p class="hint center" style="font-size:2.2vh; margin:1.4vh 0 0;">
       台下學員共 ${t.total} 人作答　正解 <b style="color:var(--gold)">${key || "—"}</b>
     </p>`;
 }
 
-// ------------------------------------------------------------
-//  公布階段的左右鍵：答案 ⇄ 說明
-// ------------------------------------------------------------
-/** 這一題公布階段有哪幾頁 —— 沒填整頁大圖就不會有那一頁 */
-function revealPages(q) {
-  const pages = ["answer"];
-  if ((q?.exImgFull || "").trim()) pages.push("fullimg");
-  pages.push("dist");
-  return pages;
-}
+/** 每五題插播：目前戰況前五名 */
+function paintStandings(qid) {
+  foot.textContent = "目前戰況";
+  const rows = scoreboardNow().rows.slice(0, STANDINGS_TOP);
+  const done = qIndex(qid) + 1;
 
-addEventListener("keydown", e => {
-  if ((state.phase || "") !== PHASE.REVEAL) return;
-  const q = state.qid ? questions[state.qid] : null;
-  if (!q) return;
-  const last = revealPages(q).length - 1;
-  if (e.key === "ArrowRight") { revealPage = Math.min(last, revealPage + 1); repaintReveal(); }
-  if (e.key === "ArrowLeft")  { revealPage = Math.max(0,    revealPage - 1); repaintReveal(); }
-});
-
-function repaintReveal() {
-  const qid = state.qid, q = qid ? questions[qid] : null;
-  if (!q) return;
-  const pages = revealPages(q);
-  revealPage = Math.min(revealPage, pages.length - 1);
-
-  const painter = { answer: paintReveal, fullimg: paintFullImage, dist: paintDistribution };
-  painter[pages[revealPage]](qid, q);
-
-  // 頁尾提示要照實際頁序給，不然主持人會不知道還有沒有下一頁
-  const prev = revealPage > 0 ? "← " + PAGE_NAME[pages[revealPage - 1]] : "";
-  const next = revealPage < pages.length - 1 ? PAGE_NAME[pages[revealPage + 1]] + " →" : "";
-  tip.textContent = [prev, next].filter(Boolean).join("　　");
-}
-
-const PAGE_NAME = {
-  answer:  "答案與說明",
-  fullimg: "補充大圖",
-  dist:    "全場作答分布"
-};
-
-// ------------------------------------------------------------
-//  最終畫面
-// ------------------------------------------------------------
-function scoreboardNow() {
-  return buildScoreboard(groups, questions, keys, allResp, repAns, state.revealed, LISTS.MAIN);
-}
-
-function paintFinal() {
-  if (finalView === "matrix") return paintMatrixScreen();
-
-  foot.textContent = "最終排行榜";
-  tip.textContent  = "按空白鍵切換到類別分析 →";
-
-  const rows = board?.rows || scoreboardNow().rows;
   body.innerHTML = `
-    <h2 class="title-gold center" style="font-size:5vh; margin:0 0 1.6vh;">★ 最終排行榜 ★</h2>
+    <h2 class="title-gold intro-title" style="margin:0 0 .6vh;">⚡ 目前戰況 ⚡</h2>
+    <p class="hint center" style="font-size:2.3vh; margin:0 0 2vh;">已完成 ${done} 題　顯示前 ${STANDINGS_TOP} 名</p>
     <div class="card" style="overflow:hidden;">
       <table class="rank rank-screen">
         <thead><tr>
-          <th style="width:8vh;">#</th><th>組別</th>
+          <th style="width:9vh;">#</th><th>組別</th>
           <th class="n">總分</th><th class="n">代表答對</th><th class="n">學員過半</th>
         </tr></thead>
         <tbody>${
           rows.length
             ? rows.map((r, i) => `<tr class="${i === 0 ? "top1" : ""}">
-                <td>${i === 0 ? "🏆" : i + 1}</td>
+                <td>${i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</td>
                 <td>${escapeHtml(r.name)}</td>
                 <td class="n">${r.points}</td>
                 <td class="n">${r.repCorrect}</td>
@@ -428,17 +602,79 @@ function paintFinal() {
       </table>
     </div>`;
   const t = $(".rank-screen");
-  fitToBox(t, t.parentElement, "--rfs", 2.8);
+  fitToBox(t, t.parentElement, "--rfs", 3.6);
 }
 
-/** 組別 × 類別 得分矩陣 */
+// ============================================================
+//  最終：頒獎台（只公布前三名）→ 類別分析
+// ============================================================
+function paintFinal() {
+  const rows = board?.rows || scoreboardNow().rows;
+
+  if (podiumStep > PODIUM_TOP) return paintMatrixScreen();
+
+  foot.textContent = "頒獎";
+  tip.textContent = podiumStep === 0
+    ? "按空白鍵開始頒獎 →"
+    : podiumStep < PODIUM_TOP
+      ? `按空白鍵公布第 ${PODIUM_TOP - podiumStep} 名 →`
+      : "按空白鍵看類別分析 →";
+
+  const top = rows.slice(0, PODIUM_TOP);
+  // 版面順序是 2 - 1 - 3，揭曉順序是 3 → 2 → 1
+  const layout = [
+    { rank: 2, cls: "p2", medal: "🥈" },
+    { rank: 1, cls: "p1", medal: "🥇" },
+    { rank: 3, cls: "p3", medal: "🥉" }
+  ];
+
+  body.innerHTML = `
+    <h2 class="title-gold intro-title" style="margin:0 0 1vh;">★ 頒獎典禮 ★</h2>
+    <div class="podium">
+      ${layout.map(({ rank, cls, medal }) => {
+        const r = top[rank - 1];
+        const revealedAt = PODIUM_TOP - rank + 1;      // 第三名在第 1 步、第一名在第 3 步
+        const shown = podiumStep >= revealedAt;
+        if (!r) return `<div class="place ${cls}"></div>`;
+        return `<div class="place ${cls} ${shown ? "shown" : ""}">
+          <div class="medal">${medal}</div>
+          <div class="gname">${escapeHtml(r.name)}</div>
+          <div class="score">${r.points} 分</div>
+          <div class="detail">代表答對 ${r.repCorrect}　學員過半 ${r.memberBonus}</div>
+          <div class="block">${rank}</div>
+        </div>`;
+      }).join("")}
+    </div>`;
+
+  if (podiumStep >= PODIUM_TOP && top.length) dropConfetti();
+}
+
+function dropConfetti() {
+  stage.querySelector(".confetti")?.remove();
+  const wrap = document.createElement("div");
+  wrap.className = "confetti";
+  const colors = ["#ffc81f", "#35a8ff", "#e6266f", "#2fd96b", "#8b5cf6", "#fff"];
+  let html = "";
+  for (let i = 0; i < 90; i++) {
+    const left = Math.random() * 100;
+    const dur  = 2.6 + Math.random() * 2.6;
+    const del  = Math.random() * 1.6;
+    const col  = colors[i % colors.length];
+    html += `<i style="left:${left.toFixed(1)}%; background:${col};
+      animation-duration:${dur.toFixed(2)}s; animation-delay:${del.toFixed(2)}s"></i>`;
+  }
+  wrap.innerHTML = html;
+  stage.appendChild(wrap);
+  setTimeout(() => wrap.remove(), 9000);
+}
+
 function paintMatrixScreen() {
   foot.textContent = "類別分析";
-  tip.textContent  = "← 按空白鍵切回排行榜";
+  tip.textContent  = "← 按空白鍵回到頒獎台";
 
   const mx = categoryMatrix(scoreboardNow());
   if (!mx.cats.length || !mx.rows.length) {
-    body.innerHTML = `<p class="hint center" style="font-size:2.6vh;">還沒有已公布的正式題目</p>`;
+    body.innerHTML = `<p class="hint center" style="font-size:2.8vh;">還沒有已公布的正式題目</p>`;
     return;
   }
 
@@ -447,8 +683,8 @@ function paintMatrixScreen() {
   const bestIdx = new Map(bestOf.map(b => [b.gid, b.cat ? mx.cats.findIndex(c => c.id === b.cat.id) : -1]));
 
   body.innerHTML = `
-    <h2 class="title-gold center" style="font-size:4.2vh; margin:0 0 1.2vh;">各組強項分析</h2>
-    <p class="hint center" style="font-size:1.85vh; margin:0 0 1.4vh;">
+    <h2 class="title-gold center" style="font-size:4.6vh; margin:0 0 1.2vh;">各組強項分析</h2>
+    <p class="hint center" style="font-size:2.1vh; margin:0 0 1.4vh;">
       數字為該類別得分率　<b style="color:var(--gold)">金色</b>＝該類別最強的組
       <b style="color:var(--cyan-lt)">藍框</b>＝該組最強的類別
     </p>
@@ -476,5 +712,5 @@ function paintMatrixScreen() {
       </table>
     </div>`;
   const t = $(".matrix-screen");
-  fitToBox(t, t.parentElement, "--mfs", 2.2);
+  fitToBox(t, t.parentElement, "--mfs", 2.6);
 }

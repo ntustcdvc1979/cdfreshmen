@@ -6,7 +6,7 @@
 import {
   db, auth, ref, onValue, get, set, remove, serverTimestamp, ensureAnonAuth,
   PATH, PHASE, ROLE, LETTERS, LISTS, DEFAULT_LIMIT_SEC,
-  categoryOf, listOf, questionsOf, tallyMembers, scoreOne, secondsLeft,
+  categoryOf, listOf, questionsOf, tallyMembers, scoreOne, secondsLeft, ptsOf,
   $, show, toast, toSortedList, escapeHtml
 } from "./common.js";
 
@@ -242,6 +242,10 @@ function renderQuestion(qid, q, phase) {
     $("#q-text").textContent = q.text || "";
     paintCatPill($("#q-cat"), q);
 
+    const pts = ptsOf(q);
+    $("#q-pts").textContent = "+" + pts;
+    $("#q-pts").style.display = pts !== 1 ? "" : "none";
+
     const box = $("#opts");
     box.innerHTML = "";
     for (const L of LETTERS) {
@@ -415,7 +419,7 @@ function renderReveal(qid, q) {
   const repaint = () => {
     $("#r-letter").textContent = key || "—";
 
-    const s = scoreOne(key, repAns, members);
+    const s = scoreOne(key, repAns, members, ptsOf(q));
     const v = $("#r-verdict");
     if (!repAns)          { v.className = "verdict";     v.textContent = "你們這組代表沒有作答"; }
     else if (s.repOk)     { v.className = "verdict ok";  v.textContent = `代表答對了！選 ${s.repChoice}`; }
@@ -467,15 +471,31 @@ async function renderFinal() {
   try {
     const snap = await get(ref(db, PATH.leaderboard));
     const rows = snap.val()?.rows || [];
-    $("#final-rows").innerHTML = rows.length
-      ? rows.map((r, i) => `<tr class="${i === 0 ? "top1" : ""}">
-          <td>${i === 0 ? "🏆" : i + 1}</td>
+    // 跟投影幕一致：只公布前三名
+    const top = rows.slice(0, 3);
+    const mineIdx = rows.findIndex(r => r.gid === myGroup);
+
+    $("#final-rows").innerHTML = top.length
+      ? top.map((r, i) => `<tr class="${i === 0 ? "top1" : ""}">
+          <td>${["🥇", "🥈", "🥉"][i]}</td>
           <td>${escapeHtml(r.name)}${r.gid === myGroup ? " ←" : ""}</td>
           <td class="n">${r.points}</td>
           <td class="n">${r.repCorrect}</td>
           <td class="n">${r.memberBonus}</td>
         </tr>`).join("")
       : `<tr><td colspan="5" style="color:#a9bce8;">主持人尚未產生排行榜</td></tr>`;
+
+    // 自己這組沒進前三，就單獨補一行讓他們知道名次
+    if (mineIdx >= 3) {
+      const r = rows[mineIdx];
+      $("#final-rows").insertAdjacentHTML("beforeend",
+        `<tr><td colspan="5" style="color:#5f6f9c; text-align:center; padding:4px;">⋯</td></tr>
+         <tr><td>${mineIdx + 1}</td>
+           <td>${escapeHtml(r.name)} ←</td>
+           <td class="n">${r.points}</td>
+           <td class="n">${r.repCorrect}</td>
+           <td class="n">${r.memberBonus}</td></tr>`);
+    }
 
     const mine = rows.find(r => r.gid === myGroup);
     if (mine?.bestCat) {

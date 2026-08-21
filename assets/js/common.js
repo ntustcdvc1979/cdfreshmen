@@ -91,9 +91,9 @@ export function authErrorText(e) {
 // ---------- 資料庫路徑 ----------
 //  /admins/{uid}                  = true                            ← 主持人白名單，只能從主控台改
 //  /config/groups/{gid}           = { name, order }
-//  /questions/{qid}               = { order, text, a,b,c,d, cat, list,
-//                                     exText, exImg, exImgFull }
-//                                                                    ← 公開可讀，不含正解
+//  /config/intro                  = { rulesImg }                     ← 規則頁的圖（選填）
+//  /questions/{qid}               = { order, text, a,b,c,d, cat, list, pts,
+//                                     exText, exImg, exImgFull }      ← 公開可讀，不含正解
 //  /answerKey/{qid}               = "A"                              ← 只有公布後才讀得到
 //  /state                         = { phase, list, qid, openedAt, limitSec,
 //                                     gridCols, showRepLetters, revealed:{qid:true} }
@@ -105,6 +105,7 @@ export function authErrorText(e) {
 export const PATH = {
   admins:     "admins",
   groups:     "config/groups",
+  intro:      "config/intro",
   questions:  "questions",
   answerKey:  "answerKey",
   state:      "state",
@@ -268,13 +269,20 @@ export function questionsOf(questions, list) {
 
 // ---------- 計分 ----------
 //
-//  每題每組最多 2 分：
-//    代表答對                        → +1
-//    台下學員答對率 >= 50%           → +1
+//  每題每組最多拿到「配分 × 2」：
+//    代表答對                        → +配分
+//    台下學員答對率 >= 50%           → +配分
+//  配分預設 1，可以逐題調整（後台的「配分」欄位）。
 //  排行榜就比總分。DEMO 題庫不計分。
 
 export const MEMBER_PASS_RATE = 0.5;
-export const POINTS_PER_QUESTION = 2;
+export const DEFAULT_POINTS = 1;
+
+/** 這一題值幾分（沒設定就是 1）。只接受 1～99 的整數。 */
+export function ptsOf(q) {
+  const n = Math.round(Number(q?.pts));
+  return Number.isFinite(n) && n >= 1 && n <= 99 ? n : DEFAULT_POINTS;
+}
 
 /** 統計一組數字：{A,B,C,D,total} */
 export function tally(entries) {
@@ -308,7 +316,7 @@ export function tallyReps(repsForQuestion) {
  * 一組在一題上拿幾分。
  * @returns { repChoice, repOk, memberTally, memberRate, memberOk, points }
  */
-export function scoreOne(key, repAnswer, memberByGroup) {
+export function scoreOne(key, repAnswer, memberByGroup, pts = DEFAULT_POINTS) {
   const repChoice = LETTERS.includes(repAnswer?.c) ? repAnswer.c : null;
   const repOk     = repChoice ? repChoice === key : false;
 
@@ -324,7 +332,8 @@ export function scoreOne(key, repAnswer, memberByGroup) {
     memberCorrect: ok,
     memberRate: rate === null ? null : Math.round(rate * 1000) / 10,
     memberOk,
-    points: (repOk ? 1 : 0) + (memberOk ? 1 : 0)
+    pts,
+    points: (repOk ? pts : 0) + (memberOk ? pts : 0)
   };
 }
 
@@ -341,7 +350,7 @@ export function buildScoreboard(groups, questions, answerKeys, responses, repAns
   const usedCats = new Set();
   const rows = toSortedList(groups).map(g => ({
     gid: g.id, name: g.name,
-    points: 0, max: qs.length * POINTS_PER_QUESTION,
+    points: 0, max: qs.reduce((n, q) => n + ptsOf(q) * 2, 0),
     repCorrect: 0, repAnswered: 0,
     memberBonus: 0, memberCorrect: 0, memberAnswered: 0,
     byCat: {}
@@ -352,11 +361,12 @@ export function buildScoreboard(groups, questions, answerKeys, responses, repAns
     const cat = categoryOf(q.cat).id;
     usedCats.add(cat);
 
+    const pts = ptsOf(q);
     for (const row of rows) {
       row.byCat[cat] ??= { points: 0, max: 0 };
-      row.byCat[cat].max += POINTS_PER_QUESTION;
+      row.byCat[cat].max += pts * 2;
 
-      const s = scoreOne(key, repAnswers?.[q.id]?.[row.gid], responses?.[q.id]?.[row.gid]);
+      const s = scoreOne(key, repAnswers?.[q.id]?.[row.gid], responses?.[q.id]?.[row.gid], pts);
       if (s.repChoice) row.repAnswered++;
       if (s.repOk)     row.repCorrect++;
       row.memberAnswered += s.memberTally.total;

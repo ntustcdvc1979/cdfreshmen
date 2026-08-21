@@ -65,6 +65,27 @@
       </div>
     </div>
 
+    <!-- 開場設定 -->
+    <div class="card stack">
+      <strong class="title-gold" style="font-size:20px;">開場畫面</strong>
+      <p class="hint" style="text-align:left; margin:0;">
+        投影幕在待機時有三頁，用 <b>→</b> / <b>←</b> 翻：
+        六大主題 → 遊戲規則 → 掃碼進場（含各組代表就位狀況）。
+      </p>
+      <div class="field">
+        <label for="in-rulesimg">規則頁的圖片網址（選填）</label>
+        <input id="in-rulesimg" placeholder="https://… 或 assets/img/explain/rules.png">
+      </div>
+      <div id="rules-preview" class="center hidden" style="margin:4px 0;">
+        <img id="rules-preview-img" alt="規則圖預覽" style="max-width:100%; max-height:200px; border-radius:10px; box-shadow:0 0 0 2px rgba(255,200,31,.35);">
+      </div>
+      <p class="hint" style="text-align:left; margin:0;">
+        留空的話會用內建的流程示意圖（台下學員 → 代表 → 確認送出 → 計分），
+        不會開天窗。填了就換成你自己的圖。
+      </p>
+      <button id="btn-rulesimg" class="btn mini">儲存</button>
+    </div>
+
     <!-- 題目 -->
     <div class="card stack">
       <div class="row" style="justify-content:space-between; align-items:center;">
@@ -104,10 +125,18 @@
           </select>
         </div>
       </div>
+      <div class="field">
+        <label for="ed-pts">配分</label>
+        <input id="ed-pts" type="number" min="1" max="99" step="1" value="1">
+      </div>
+      <p class="hint" style="text-align:left; margin:0;">
+        預設 1 分：代表答對 +1、學員答對過半再 +1。改成 N 就變成各 +N。
+        <b>只有不是 1 的時候</b>，投影幕才會在題號旁顯示 <code>+N</code>。
+      </p>
 
       <hr style="border:none; border-top:1px solid rgba(53,168,255,.3); margin:4px 0;">
       <p class="hint" style="text-align:left; margin:0;">
-        <b style="color:var(--gold-lt)">公布答案後的說明</b>　主持人在投影幕上按 <b>→</b> 就會切到這一頁。
+        <b style="color:var(--gold-lt)">公布答案後的說明</b>　會跟正解<b>同時</b>出現在投影幕上，不用再按鍵。
       </p>
       <div class="field">
         <label for="ed-extext">說明文字</label>

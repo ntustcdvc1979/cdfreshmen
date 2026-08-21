@@ -6,7 +6,7 @@ import {
   db, auth, ref, onValue, set, update, remove, serverTimestamp,
   signInWithGoogle, consumeRedirectResult, authErrorText, signOut, onAuthStateChanged,
   PATH, PHASE, LISTS, LIST_LABEL, LETTERS, DEFAULT_LIMIT_SEC,
-  categoryOf, questionsOf, tallyAllMembers, tallyReps, scoreOne, secondsLeft,
+  categoryOf, questionsOf, tallyAllMembers, tallyReps, scoreOne, secondsLeft, ptsOf,
   buildScoreboard, categoryMatrix, categoryChampions, groupBestCategories, columnWinners,
   isHost, notHostHtml, $, show, toast, toSortedList, escapeHtml
 } from "./common.js";
@@ -268,7 +268,9 @@ function paint() {
   $("#live-cat").textContent = q ? cat.name : "—";
   $("#live-cat").style.setProperty("--cat", cat.color);
 
-  $("#live-q").textContent   = q ? `第 ${qIndex(qid) + 1} 題　${q.text || ""}` : "尚未選擇題目";
+  $("#live-q").textContent   = q
+    ? `第 ${qIndex(qid) + 1} 題${ptsOf(q) !== 1 ? `（本題 +${ptsOf(q)}）` : ""}　${q.text || ""}`
+    : "尚未選擇題目";
   $("#live-key").textContent = key || "（未設定）";
 
   const gl  = toSortedList(groups);
@@ -283,7 +285,7 @@ function paint() {
   const board = buildScoreboard(groups, questions, keys, allResp, repAns, state.revealed, LISTS.MAIN);
   $("#rank-rows").innerHTML = board.rows.length
     ? board.rows.map((r, i) => {
-        const s = scoreOne(key, repAns[qid]?.[r.gid], allResp[qid]?.[r.gid]);
+        const s = scoreOne(key, repAns[qid]?.[r.gid], allResp[qid]?.[r.gid], ptsOf(q));
         return `<tr class="${i === 0 && r.points ? "top1" : ""}">
           <td>${i + 1}</td>
           <td>${escapeHtml(r.name)}</td>

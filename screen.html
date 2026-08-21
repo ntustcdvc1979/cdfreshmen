@@ -9,59 +9,72 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
 <style>
-  /* 投影用：固定 16:9，字級隨畫面縮放 */
+  /* 投影用：固定 16:9。字級整體比之前放大一級，最後一排也看得清楚。 */
   html, body { height: 100%; overflow: hidden; }
 
   .stage {
     position: relative;
     width: 100vw; height: 100vh;
     display: flex; flex-direction: column;
-    padding: 2.6vh 3vw;
-    font-size: 1.85vh;
+    padding: 2.4vh 2.6vw;
+    font-size: 2.1vh;
   }
-  .stage .logo { width: 20vh; margin: 0;
+  .stage .logo { width: 21vh; margin: 0;
     -webkit-mask-image: radial-gradient(ellipse 62% 62% at 50% 50%, #000 58%, transparent 100%);
             mask-image: radial-gradient(ellipse 62% 62% at 50% 50%, #000 58%, transparent 100%); }
 
-  .top { display: flex; align-items: center; justify-content: space-between; gap: 2vw; }
-  .top .qbadge { font-size: 2.4vh; padding: 1vh 2vw; }
-  .top .qbadge b { font-size: 3.1vh; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 2vw; flex: 0 0 auto; }
+  .top .qbadge { font-size: 3.2vh; padding: 1.2vh 2.2vw; }
+  .top .qbadge b { font-size: 4.2vh; }
+  .top .cat-pill { font-size: 2.7vh; padding: 1vh 1.8vw; }
+
+  /* 配分徽章：只有不是 +1 的題目才會出現 */
+  .pts-badge {
+    display: inline-flex; align-items: center;
+    font-size: 3.2vh; font-weight: 900; line-height: 1;
+    padding: 1vh 1.8vw;
+    color: #4a2c00;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #fff2b8, var(--gold) 55%, #dc9400);
+    box-shadow: 0 0 2.4vh rgba(255,200,31,.75);
+    animation: pts-pop .5s cubic-bezier(.2,1.6,.4,1);
+  }
+  @keyframes pts-pop { from { transform: scale(.6); } to { transform: scale(1); } }
 
   .body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 2vh; min-height: 0; }
 
   .foot { display: flex; align-items: center; justify-content: space-between; gap: 2vw;
-          color: var(--txt-dim); font-size: 1.8vh; }
+          color: var(--txt-dim); font-size: 2vh; flex: 0 0 auto; }
   .foot b { color: var(--gold); }
   #s-tip { flex: 1 1 auto; text-align: center; color: var(--gold-lt); }
 
   /* ---------- 題幹 ---------- */
   .big-q {
     text-align: center;
-    font-size: 3.9vh; font-weight: 900; line-height: 1.32;
+    font-size: 4.6vh; font-weight: 900; line-height: 1.3;
     color: #08205c;
     background: linear-gradient(180deg, #fff, #e6efff);
     border: .45vh solid var(--cyan);
     box-shadow: 0 0 4vh rgba(53,168,255,.7);
-    padding: 2.4vh 3vw;
+    padding: 2.6vh 2.6vw;
     clip-path: polygon(2.6vh 0, 100% 0, 100% calc(100% - 2.6vh), calc(100% - 2.6vh) 100%, 0 100%, 0 2.6vh);
   }
-  .opt-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2vh 2vw; }
-  .opt-mini { display: flex; align-items: center; gap: 1vw; font-size: 2.3vh; font-weight: 700; color: #dce9ff; }
+  .opt-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4vh 2vw; }
+  .opt-mini { display: flex; align-items: center; gap: 1vw; font-size: 3vh; font-weight: 700; color: #dce9ff; }
   .opt-mini .k {
-    flex: 0 0 auto; width: 4.4vh; height: 4.9vh; display: grid; place-items: center;
-    font-size: 2.5vh; font-weight: 900; color: #6b3b00;
+    flex: 0 0 auto; width: 5.4vh; height: 6vh; display: grid; place-items: center;
+    font-size: 3.2vh; font-weight: 900; color: #6b3b00;
     background: linear-gradient(180deg, #fff2b8, var(--gold) 50%, #e09a00);
     clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
   }
 
   /* ---------- 倒數計時 ---------- */
   .countdown {
-    position: relative;
-    flex: 0 0 auto;
-    width: 15vh; height: 15vh;
+    position: relative; flex: 0 0 auto;
+    width: 17vh; height: 17vh;
     display: grid; place-items: center;
     border-radius: 50%;
-    font-size: 7.6vh; font-weight: 900; line-height: 1;
+    font-size: 8.8vh; font-weight: 900; line-height: 1;
     font-variant-numeric: tabular-nums;
     color: var(--cyan-lt);
     background: radial-gradient(circle at 50% 45%, rgba(20,50,160,.9), rgba(2,8,44,.95));
@@ -78,7 +91,6 @@
   }
   @keyframes cd-throb { 0%,100% { transform: scale(1); } 50% { transform: scale(1.09); } }
 
-  /* 最後幾秒整個畫面微震 */
   .stage.shake { animation: shake .28s linear infinite; }
   @keyframes shake {
     0%,100% { transform: translate(0,0); }
@@ -87,11 +99,7 @@
     75%     { transform: translate(.2vh,.16vh); }
   }
 
-  /* 掠過畫面的掃描光，製造緊張感 */
-  .sweep {
-    position: absolute; inset: 0; pointer-events: none; overflow: hidden; opacity: 0;
-    transition: opacity .4s ease;
-  }
+  .sweep { position: absolute; inset: 0; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity .4s ease; }
   .stage.tense .sweep { opacity: 1; }
   .sweep::before {
     content: ""; position: absolute; top: -20%; left: -30%;
@@ -103,17 +111,10 @@
   @keyframes sweep { to { left: 130%; } }
 
   /* ---------- 各組代表答案格 ---------- */
-  .grid {
-    display: grid;
-    gap: 1.1vh 1vw;
-    flex: 1 1 auto;
-    min-height: 0;
-    align-content: stretch;
-  }
+  .grid { display: grid; gap: 1.1vh 1vw; flex: 1 1 auto; min-height: 0; align-content: stretch; }
   .cellbox {
     position: relative;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: .3vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3vh;
     border-radius: 1vh;
     border: .28vh solid rgba(53,168,255,.4);
     background: linear-gradient(180deg, rgba(8,22,96,.75), rgba(2,8,48,.8));
@@ -121,16 +122,12 @@
     transition: box-shadow .3s ease, border-color .3s ease, background .3s ease;
   }
   .cellbox .gname {
-    font-size: var(--cell-name, 1.9vh); font-weight: 800; color: #b8cdf5;
+    font-size: var(--cell-name, 2.2vh); font-weight: 800; color: #b8cdf5;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 92%;
   }
-  .cellbox .glet {
-    font-size: var(--cell-let, 6vh); font-weight: 900; line-height: 1;
-    color: #33477e;
-  }
-  .cellbox .waiting { font-size: var(--cell-name, 1.9vh); color: #4a5a8c; font-weight: 700; letter-spacing: .2em; }
+  .cellbox .glet { font-size: var(--cell-let, 6vh); font-weight: 900; line-height: 1; color: #33477e; }
+  .cellbox .waiting { font-size: var(--cell-name, 2.2vh); color: #4a5a8c; font-weight: 700; letter-spacing: .2em; }
 
-  /* 已確認 */
   .cellbox.done {
     border-color: var(--gold);
     background: linear-gradient(180deg, rgba(70,52,6,.85), rgba(28,20,2,.9));
@@ -145,103 +142,196 @@
   .cellbox.done .gname { color: var(--gold-lt); }
   @keyframes cell-pop { from { transform: scale(.86); } to { transform: scale(1); } }
 
-  /* 公布答案後：答對 / 答錯 */
   .cellbox.right { border-color: var(--ok);  box-shadow: 0 0 2.6vh rgba(47,217,107,.6); }
   .cellbox.right .glet { background: linear-gradient(180deg,#d6ffe6,#2fd96b 50%,#0f8a3d);
     -webkit-background-clip: text; background-clip: text; color: transparent; }
   .cellbox.right  .gname { color: #9dffc4; }
   .cellbox.wrongc { border-color: rgba(255,84,112,.55); opacity: .62; }
   .cellbox.wrongc .glet { color: #ff8497; background: none; -webkit-text-fill-color: #ff8497; }
+  .cellbox .mark { position: absolute; top: .5vh; right: .7vw; font-size: 2.2vh; }
 
-  .cellbox .mark { position: absolute; top: .5vh; right: .7vw; font-size: 1.9vh; }
-
-  /* ---------- 公布答案（答案與說明同時出現） ---------- */
-  .huge-letter { font-size: 26vh; }
-
-  .reveal-top {
-    display: flex; gap: 2vw; align-items: stretch;
-    flex: 1 1 auto; min-height: 0;
-  }
-  .reveal-ans {
-    flex: 0 0 20%;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-  }
-  .reveal-ans .reveal-letter { font-size: 17vh; }
+  /* ---------- 公布答案 ---------- */
+  .reveal-top { display: flex; gap: 2vw; align-items: stretch; flex: 1 1 auto; min-height: 0; }
+  .reveal-ans { flex: 0 0 21%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .reveal-ans .reveal-letter { font-size: 20vh; }
   .reveal-ex {
-    flex: 1 1 auto; min-width: 0;
-    display: flex; flex-direction: column;
-    border-left: .28vh solid rgba(255,200,31,.35);
-    padding-left: 2vw;
+    flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;
+    border-left: .28vh solid rgba(255,200,31,.35); padding-left: 2vw;
   }
 
-  /* ---------- 說明 ---------- */
   .explain { display: flex; gap: 2vw; align-items: stretch; min-height: 0; flex: 1 1 auto; }
   .explain .txt {
     flex: 1 1 auto; min-width: 0; overflow: hidden;
-    font-size: var(--ex-fs, 2.4vh); line-height: 1.55; color: #e6eeff;
-    white-space: pre-wrap;
+    font-size: var(--ex-fs, 3vh); line-height: 1.5; color: #e6eeff; white-space: pre-wrap;
   }
   /* grid 的軌道要用 minmax(0, 1fr) 夾住，否則軌道會被圖片撐高，
      img 的 max-height:100% 就失去參考對象，圖會被切掉 */
   .explain .pic {
     flex: 0 0 38%; min-width: 0;
-    display: grid;
-    grid-template-rows: minmax(0, 1fr);
-    grid-template-columns: minmax(0, 1fr);
+    display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr);
     place-items: center;
   }
   .explain .pic img {
-    max-width: 100%; max-height: 100%; object-fit: contain;
-    border-radius: 1.2vh;
+    max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 1.2vh;
     box-shadow: 0 0 0 .3vh rgba(255,200,31,.4), 0 1.4vh 4vh rgba(0,0,0,.6);
   }
   .explain.noimg .pic { display: none; }
 
-  /* ---------- 補充大圖：整頁只放一張圖 ---------- */
+  /* ---------- 補充大圖 ---------- */
   .fullimg {
     flex: 1 1 auto; min-height: 0;
-    display: grid;
-    grid-template-rows: minmax(0, 1fr);
-    grid-template-columns: minmax(0, 1fr);
+    display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr);
     place-items: center;
   }
   .fullimg img {
-    max-width: 100%; max-height: 100%;
-    object-fit: contain;
-    border-radius: 1vh;
+    max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 1vh;
     box-shadow: 0 0 0 .3vh rgba(255,200,31,.4), 0 2vh 5vh rgba(0,0,0,.65);
   }
 
   /* ---------- 統計條 ---------- */
-  .screen-bars { display: grid; gap: 1.3vh; }
-  .screen-bars .bar-key   { width: 5.4vh; height: 6vh; font-size: 3vh; }
-  .screen-bars .bar-track { height: 5vh; border-radius: 1vh; }
-  .screen-bars .bar-num   { min-width: 15vw; font-size: 2.4vh; }
-  .screen-bars .bar-opt   { flex: 0 0 24vw; font-size: 2.1vh; font-weight: 700; color: #d8e6ff;
+  .screen-bars { display: grid; gap: 1.5vh; }
+  .screen-bars .bar-key   { width: 6.4vh; height: 7vh; font-size: 3.6vh; }
+  .screen-bars .bar-track { height: 6vh; border-radius: 1vh; }
+  .screen-bars .bar-num   { min-width: 16vw; font-size: 3vh; }
+  .screen-bars .bar-opt   { flex: 0 0 24vw; font-size: 2.7vh; font-weight: 700; color: #d8e6ff;
                             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* ---------- 排行榜 ---------- */
-  table.rank.rank-screen { width: 100%; --rfs: 2.8vh; }
-  table.rank.rank-screen th { font-size: calc(var(--rfs) * .7); padding: calc(var(--rfs) * .3) .8vw; }
+  /* ---------- 排行榜表格 ---------- */
+  table.rank.rank-screen { width: 100%; --rfs: 3.6vh; }
+  table.rank.rank-screen th { font-size: calc(var(--rfs) * .62); padding: calc(var(--rfs) * .3) .8vw; }
   table.rank.rank-screen td { font-size: var(--rfs); padding: calc(var(--rfs) * .4) .8vw; line-height: 1.22; }
-  table.rank.rank-screen tr.top1 td { font-size: calc(var(--rfs) * 1.26); }
+  table.rank.rank-screen tr.top1 td { font-size: calc(var(--rfs) * 1.22); }
 
   /* ---------- 類別矩陣 ---------- */
-  table.matrix.matrix-screen { --mfs: 2.2vh; }
+  table.matrix.matrix-screen { --mfs: 2.6vh; }
   table.matrix.matrix-screen th,
   table.matrix.matrix-screen td { padding: calc(var(--mfs) * .32) .5vw; font-size: var(--mfs); line-height: 1.18; }
   table.matrix.matrix-screen thead th { font-size: calc(var(--mfs) * .8); }
   table.matrix.matrix-screen td small { font-size: calc(var(--mfs) * .56); }
 
+  /* ============================================================
+     開場三頁：六大主題 / 規則 / QR + 代表就位
+     ============================================================ */
+  .intro-title { font-size: 6vh; margin: 0 0 2.4vh; text-align: center; }
+
+  /* grid-auto-rows 要夾住，否則列高由卡片內容決定，六張卡會撐出容器 */
+  .themes {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: minmax(0, 1fr);
+    gap: 2vh 2vw; flex: 1 1 auto; min-height: 0;
+  }
+  .theme {
+    position: relative; display: flex; align-items: center; gap: 1.4vw;
+    padding: 2vh 1.6vw; border-radius: 1.6vh;
+    border: .4vh solid var(--cat);
+    background: linear-gradient(135deg, rgba(255,255,255,.14), rgba(4,9,58,.92));
+    box-shadow: 0 0 3vh rgba(53,168,255,.25);
+    animation: theme-in .5s backwards cubic-bezier(.2,1.4,.4,1);
+    overflow: hidden;
+  }
+  /* 用一層半透明的類別色鋪底，不依賴 color-mix，舊瀏覽器也吃得到 */
+  .theme::before {
+    content: ""; position: absolute; inset: 0;
+    background: var(--cat); opacity: .34;
+  }
+  .theme > * { position: relative; }
+  @keyframes theme-in { from { opacity: 0; transform: translateY(3vh) scale(.94); } }
+  .theme .num {
+    flex: 0 0 auto; width: 8vh; height: 8vh; display: grid; place-items: center;
+    font-size: 4vh; font-weight: 900; color: #6b3b00;
+    background: linear-gradient(180deg, #fff2b8, var(--gold) 50%, #e09a00);
+    clip-path: polygon(50% 0, 100% 22%, 100% 78%, 50% 100%, 0 78%, 0 22%);
+    text-shadow: 0 1px 0 rgba(255,255,255,.5);
+  }
+  .theme .nm { font-size: 4vh; font-weight: 900; line-height: 1.15; color: #fff;
+               text-shadow: 0 .3vh .6vh rgba(0,0,0,.55); }
+
+  .rules { display: flex; gap: 2.6vw; flex: 1 1 auto; min-height: 0; align-items: stretch; }
+  .rules ol { flex: 1 1 auto; min-width: 0; margin: 0; padding-left: 1.3em;
+              display: flex; flex-direction: column; justify-content: center; gap: 1.5vh; }
+  .rules li { font-size: 3.1vh; line-height: 1.38; color: #e6eeff; }
+  .rules li b { color: var(--gold-lt); }
+  .rules .pic {
+    flex: 0 0 42%; min-width: 0;
+    display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr);
+    place-items: center;
+  }
+  .rules .pic img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 1.2vh;
+    box-shadow: 0 0 0 .3vh rgba(255,200,31,.4), 0 1.4vh 4vh rgba(0,0,0,.6); }
+  .rules .pic svg { width: 100%; height: 100%; }
+
+  .joinpage { display: flex; gap: 3vw; flex: 1 1 auto; min-height: 0; align-items: stretch; }
+  .joinpage .qrside { flex: 0 0 36%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vh; }
+  .joinpage .qrbox { background: #fff; padding: 1.6vh; border-radius: 1.6vh; box-shadow: 0 0 4vh rgba(255,255,255,.35); }
+  .joinpage .qrbox img { display: block; width: 32vh; height: 32vh; }
+  .joinpage .url { font-size: 2.1vh; color: var(--cyan-lt); word-break: break-all; text-align: center; }
+  .joinpage .repside { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .joinpage h3 { font-size: 3.4vh; margin: 0 0 1.6vh; text-align: center; }
+
+  .repgrid { display: grid; gap: 1.2vh 1.2vw; flex: 1 1 auto; min-height: 0; align-content: stretch; }
+  .repcard {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .4vh;
+    border-radius: 1.2vh; border: .3vh solid rgba(53,168,255,.35);
+    background: rgba(6,16,80,.6);
+    transition: all .35s ease;
+  }
+  .repcard .nm { font-size: var(--rep-nm, 2.4vh); font-weight: 800; color: #8ea6d8;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 92%; }
+  .repcard .st { font-size: var(--rep-st, 1.9vh); font-weight: 700; color: #4a5a8c; letter-spacing: .1em; }
+  .repcard.ready {
+    border-color: var(--ok);
+    background: linear-gradient(180deg, rgba(12,80,40,.75), rgba(3,30,16,.85));
+    box-shadow: 0 0 2.6vh rgba(47,217,107,.5);
+    animation: rep-in .5s cubic-bezier(.2,1.6,.4,1);
+  }
+  .repcard.ready .nm { color: #b6ffd2; }
+  .repcard.ready .st { color: #4cf58c; }
+  @keyframes rep-in { from { transform: scale(.8); opacity: .3; } to { transform: scale(1); opacity: 1; } }
+
+  /* ============================================================
+     頒獎台（最終前三名）
+     ============================================================ */
+  .podium { display: flex; align-items: flex-end; justify-content: center; gap: 3vw;
+            flex: 1 1 auto; min-height: 0; padding-bottom: 1vh; }
+  .place { display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+           flex: 0 0 22%; opacity: 0; transform: translateY(6vh); }
+  .place.shown { animation: place-rise .85s cubic-bezier(.16,1.2,.3,1) forwards; }
+  @keyframes place-rise { to { opacity: 1; transform: translateY(0); } }
+
+  .place .medal { font-size: 5.4vh; line-height: 1; margin-bottom: .4vh; }
+  .place .gname { font-size: 3.9vh; font-weight: 900; line-height: 1.12; text-align: center;
+                  margin-bottom: .5vh; max-width: 100%; }
+  .place .score { font-size: 2.9vh; font-weight: 900; margin-bottom: .4vh; color: var(--gold-lt); }
+  .place .detail { font-size: 1.9vh; color: var(--txt-dim); margin-bottom: .9vh; }
+  .place .block {
+    width: 100%; display: grid; place-items: center;
+    font-size: 7vh; font-weight: 900; color: rgba(255,255,255,.3);
+    border-radius: 1.4vh 1.4vh 0 0;
+  }
+  .place.p1 .block { height: 25vh; background: linear-gradient(180deg, #ffe07a, #d99a00); box-shadow: 0 0 6vh rgba(255,200,31,.75); }
+  .place.p2 .block { height: 18.5vh; background: linear-gradient(180deg, #e8eef7, #9aa9bd); box-shadow: 0 0 4vh rgba(200,215,235,.5); }
+  .place.p3 .block { height: 13vh; background: linear-gradient(180deg, #e3a76b, #a2632a); box-shadow: 0 0 4vh rgba(210,140,70,.5); }
+  .place.p1 .gname { color: var(--gold); text-shadow: 0 0 3vh rgba(255,200,31,.7); }
+  .place.p2 .gname { color: #dfe8f5; }
+  .place.p3 .gname { color: #f0c095; }
+  .place.p1 .medal { animation: medal-bob 1.6s ease-in-out infinite; }
+  @keyframes medal-bob { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-1.2vh) scale(1.08); } }
+
+  .confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+  .confetti i {
+    position: absolute; top: -6vh; width: 1.1vh; height: 2.2vh; border-radius: .2vh;
+    animation: fall linear forwards;
+  }
+  @keyframes fall { to { transform: translateY(112vh) rotate(760deg); opacity: .15; } }
+
   /* ---------- 音效解鎖 ---------- */
   #sound-gate {
     position: fixed; inset: 0; z-index: 90;
     display: grid; place-items: center;
-    background: rgba(0,3,30,.92);
-    backdrop-filter: blur(3px);
+    background: rgba(0,3,30,.92); backdrop-filter: blur(3px);
   }
   #sound-gate .box { text-align: center; max-width: 60vw; }
-  #sound-gate .btn { font-size: 2.6vh; padding: 2vh 4vw; }
+  #sound-gate .btn { font-size: 2.8vh; padding: 2vh 4vw; }
 </style>
 </head>
 <body>
@@ -250,12 +340,13 @@
 
   <div class="top">
     <img class="logo" src="assets/img/logo.png" alt="大學星攻略">
-    <span class="cat-pill" id="s-cat" style="font-size:2.1vh; padding:.7vh 1.4vw;">—</span>
+    <span class="cat-pill" id="s-cat">—</span>
+    <span class="pts-badge" id="s-pts">+1</span>
     <span class="qbadge" id="s-badge">第 <b>–</b> 題</span>
   </div>
 
   <div class="body" id="s-body">
-    <div class="center"><div class="spin"></div><p class="hint" style="font-size:2.4vh; margin-top:2vh;">連線中…</p></div>
+    <div class="center"><div class="spin"></div><p class="hint" style="font-size:2.6vh; margin-top:2vh;">連線中…</p></div>
   </div>
 
   <div class="foot">
@@ -265,16 +356,15 @@
   </div>
 </div>
 
-<!-- 瀏覽器規定要有使用者手勢才能播音效 -->
 <div id="sound-gate" class="hidden">
   <div class="box">
-    <h2 class="title-gold" style="font-size:4.4vh; margin:0 0 1.4vh;">投影統計頁</h2>
-    <p class="hint" style="font-size:2.2vh; margin:0 0 3vh;">
+    <h2 class="title-gold" style="font-size:4.8vh; margin:0 0 1.4vh;">投影統計頁</h2>
+    <p class="hint" style="font-size:2.4vh; margin:0 0 3vh;">
       瀏覽器要求先有一次點擊才能播放音效。<br>
       按下之後請按 <b style="color:var(--gold-lt)">F11</b> 進入全螢幕。
     </p>
     <button class="btn" id="btn-sound">🔊 開啟音效並開始</button>
-    <p class="hint" style="font-size:1.8vh; margin-top:2vh;">
+    <p class="hint" style="font-size:2vh; margin-top:2vh;">
       <a href="#" id="btn-nosound" style="color:var(--txt-dim)">不要音效，直接進入</a>
     </p>
   </div>

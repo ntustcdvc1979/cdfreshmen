@@ -6,7 +6,7 @@ import {
   db, auth, ref, onValue, set, update, remove,
   signInWithGoogle, consumeRedirectResult, authErrorText, signOut, onAuthStateChanged,
   PATH, LETTERS, CATEGORIES, UNCATEGORIZED, LISTS, LIST_LABEL,
-  categoryOf, listOf, questionsOf, parseBulkQuestions,
+  categoryOf, listOf, questionsOf, parseBulkQuestions, ptsOf,
   $, show, toast, toSortedList, escapeHtml, isHost, notHostHtml
 } from "./common.js";
 
@@ -17,7 +17,7 @@ $("#ed-cat").innerHTML =
 $("#bulk-cats").innerHTML =
   CATEGORIES.map(c => `<code style="color:${c.color}">${escapeHtml(c.name)}</code>`).join(" ");
 
-let groups = {}, questions = {}, keys = {};
+let groups = {}, questions = {}, keys = {}, intro = {};
 let editing = null;            // 正在編輯的題目 id；"new" 代表新增
 let booted = false;
 let curList = LISTS.MAIN;      // 正在編輯哪個題庫
@@ -25,6 +25,19 @@ let curList = LISTS.MAIN;      // 正在編輯哪個題庫
 $("#sel-list").addEventListener("change", () => {
   curList = $("#sel-list").value === LISTS.DEMO ? LISTS.DEMO : LISTS.MAIN;
   closeEditor();
+});
+
+// 開場規則圖
+$("#in-rulesimg").addEventListener("input", paintRulesPreview);
+function paintRulesPreview() {
+  const url = $("#in-rulesimg").value.trim();
+  show($("#rules-preview"), !!url);
+  if (url) $("#rules-preview-img").src = url;
+}
+$("#btn-rulesimg").addEventListener("click", async () => {
+  const url = $("#in-rulesimg").value.trim();
+  await set(ref(db, `${PATH.intro}/rulesImg`), url || null);
+  toast(url ? "已儲存規則圖" : "已改回內建示意圖");
 });
 
 // 圖片網址即時預覽
@@ -70,6 +83,11 @@ $("#btn-login").addEventListener("click", async () => {
 $("#btn-logout").addEventListener("click", () => signOut(auth).then(() => location.reload()));
 
 function attach() {
+  onValue(ref(db, PATH.intro),     s => {
+    intro = s.val() || {};
+    $("#in-rulesimg").value = intro.rulesImg || "";
+    paintRulesPreview();
+  });
   onValue(ref(db, PATH.groups),    s => { groups    = s.val() || {}; paintGroups(); });
   onValue(ref(db, PATH.questions), s => { questions = s.val() || {}; paintQuestions(); });
   onValue(ref(db, PATH.answerKey), s => { keys      = s.val() || {}; paintQuestions(); });
@@ -161,6 +179,7 @@ function paintQuestions() {
       </div>
       <div class="meta">
         <span class="cat-pill" style="--cat:${cat.color}">${escapeHtml(cat.name)}</span>
+        ${ptsOf(q) !== 1 ? `<span class="flag ok">配分 +${ptsOf(q)}</span>` : ""}
         <span class="flag ${hasEx ? "ok" : "warn"}">${hasEx ? "有說明" : "⚠ 沒有說明"}</span>
         ${(q.exImg || "").trim()     ? `<span class="flag">含圖片</span>` : ""}
         ${(q.exImgFull || "").trim() ? `<span class="flag">含整頁大圖</span>` : ""}
@@ -197,6 +216,7 @@ function openEditor(qid) {
     : `編輯第 ${no} 題（${LIST_LABEL[listOf(q)]}）`;
 
   $("#ed-cat").value    = q.cat || "";
+  $("#ed-pts").value    = ptsOf(q);
   $("#ed-list").value   = qid === "new" ? curList : listOf(q);
   $("#ed-text").value   = q.text || "";
   $("#ed-extext").value    = q.exText || "";
@@ -227,6 +247,10 @@ $("#ed-save").addEventListener("click", async () => {
   const data = { text };
   if ($("#ed-cat").value) data.cat = $("#ed-cat").value;
   data.list = $("#ed-list").value === LISTS.DEMO ? LISTS.DEMO : LISTS.MAIN;
+
+  const pts = Math.round(Number($("#ed-pts").value));
+  if (!Number.isFinite(pts) || pts < 1 || pts > 99) { toast("配分要是 1～99 的整數"); return; }
+  if (pts !== 1) data.pts = pts;
 
   const exText   = $("#ed-extext").value.trim();
   const exImg    = $("#ed-eximg").value.trim();
