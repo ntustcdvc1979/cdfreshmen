@@ -3,7 +3,7 @@
 //  需要主持人身分（原始作答只有 /admins 名單讀得到）。
 //  在同一個瀏覽器開過 host.html 登入後，這頁會自動沿用登入狀態。
 //
-//  鍵盤：→ / ← 翻頁，空白鍵在最終畫面推進頒獎。
+//  鍵盤：→ / ← 翻頁，空白鍵在最終畫面依序公布名次。
 // ============================================================
 
 import {
@@ -32,7 +32,7 @@ const PODIUM_TOP      = 3;
 
 let introPage  = 0;   // 開場：0 六大主題 / 1 規則 / 2 QR + 代表就位
 let revealPage = 0;   // 公布：答案與說明 →（補充大圖）→（目前戰況）→ 全場分布
-let podiumStep = 0;   // 頒獎：0 還沒開始 → 3 全部揭曉 → 4 類別分析
+let podiumStep = 0;   // 排行榜：0 還沒開始 → 3 全部揭曉 → 4 類別分析
 
 // ------------------------------------------------------------
 //  音效解鎖
@@ -279,18 +279,24 @@ function paintIntro() {
   return paintJoin();
 }
 
-/** 第一頁：六大主題 */
+/** 第一頁：六大主題（活動主視覺原圖） */
 function paintThemes() {
   body.innerHTML = `
-    <h2 class="title-gold intro-title">★ 六大主題 ★</h2>
-    <div class="themes">
-      ${CATEGORIES.map((c, i) => `
-        <div class="theme" style="--cat:${c.color}; animation-delay:${(i * 0.09).toFixed(2)}s">
-          <span class="num">${i + 1}</span>
-          <span class="nm">${escapeHtml(c.name)}</span>
-        </div>`).join("")}
+    <div class="fullimg">
+      <img src="assets/img/themes.jpg" alt="六大主題"
+           onerror="this.parentElement.innerHTML=window.__themesFallback">
     </div>`;
 }
+
+// 圖載不出來時的備援：用類別色重畫六張卡，不會開天窗
+window.__themesFallback = `
+  <div class="themes">
+    ${CATEGORIES.map((c, i) => `
+      <div class="theme" style="--cat:${c.color}">
+        <span class="num">${i + 1}</span>
+        <span class="nm">${escapeHtml(c.name)}</span>
+      </div>`).join("")}
+  </div>`;
 
 /** 第二頁：規則。後台沒放圖就用內建的流程示意圖。 */
 function paintRules() {
@@ -303,7 +309,9 @@ function paintRules() {
         <li>題目出現後開始 <b>倒數</b>，台下學員在手機上選 A／B／C／D。</li>
         <li>代表看得到自己這組的 <b>即時選擇比例</b>，再決定最終答案。</li>
         <li>代表按下 <b>確認送出</b> —— 送出後不能更改，並立刻顯示在螢幕上。</li>
-        <li>代表答對 <b>+1 分</b>；台下學員答對率 <b>過半再 +1 分</b>。</li>
+        <li>代表答對 <b>+1 分</b>。</li>
+        <li>台下學員答對率過半，<b>再 +1 分</b> ——
+            這一分是<b>獨立</b>的，就算代表來不及送出也照樣拿得到。</li>
         <li>分數高的題目會在題號旁標示 <b>+N</b>，請注意把握。</li>
       </ol>
       <div class="pic">${img
@@ -427,22 +435,34 @@ function paintPlay(qid, q, phase) {
 
   const left = secondsLeft(state.openedAt, state.limitSec || DEFAULT_LIMIT_SEC, timeOffset);
 
+  // 左邊題目與選項、右邊各組格子。分左右之後 ABCD 拿得到整欄寬度，字可以放大。
   body.innerHTML = `
-    <div style="display:flex; gap:2.4vw; align-items:center; flex:0 0 auto;">
-      <div style="flex:1 1 auto; min-width:0;">
-        <div class="big-q" style="font-size:3.6vh; padding:2vh 2vw;">${escapeHtml(q.text || "")}</div>
-        <div class="opt-row" style="margin-top:1.4vh;">
+    <div class="playwrap">
+      <div class="qside">
+        <div class="big-q" id="s-bigq">${escapeHtml(q.text || "")}</div>
+        <div class="opt-list">
           ${LETTERS.filter(L => q[L.toLowerCase()]).map(L =>
-            `<div class="opt-mini"><span class="k">${L}</span><span>${escapeHtml(q[L.toLowerCase()])}</span></div>`
+            `<div class="opt-line"><span class="k">${L}</span><span class="t">${escapeHtml(q[L.toLowerCase()])}</span></div>`
           ).join("")}
         </div>
       </div>
-      <div class="countdown" id="s-countdown">${locked ? 0 : (left ?? "–")}</div>
-    </div>
-    <div class="grid" id="s-grid"></div>`;
+      <div class="rside">
+        <div class="countdown" id="s-countdown">${locked ? 0 : (left ?? "–")}</div>
+        <div class="grid" id="s-grid"></div>
+      </div>
+    </div>`;
 
   if (!locked && left !== null) paintCountdown(left);
   paintGrid(qid, false);
+
+  // 題幹與選項都縮到剛好塞得下，長題目也不會被切掉
+  const bq = $("#s-bigq");
+  fitToBox(bq, bq, "font-size", 4.2, 1.8);
+  // 要拿「整列」當量測對象 —— 拿文字自己量的話，文字盒子高度本來就等於內容，
+  // 永遠量不到溢出，反而會被邊界誤差騙到一路縮小。
+  for (const line of $(".opt-list").querySelectorAll(".opt-line")) {
+    fitToBox(line.querySelector(".t"), line, "font-size", 3.4, 1.6);
+  }
 }
 
 function paintGrid(qid, revealMode) {
@@ -606,16 +626,16 @@ function paintStandings(qid) {
 }
 
 // ============================================================
-//  最終：頒獎台（只公布前三名）→ 類別分析
+//  最終：排行榜（只公布前三名，逐一揭曉）→ 類別分析
 // ============================================================
 function paintFinal() {
   const rows = board?.rows || scoreboardNow().rows;
 
   if (podiumStep > PODIUM_TOP) return paintMatrixScreen();
 
-  foot.textContent = "頒獎";
+  foot.textContent = "排行榜";
   tip.textContent = podiumStep === 0
-    ? "按空白鍵開始頒獎 →"
+    ? "按空白鍵開始公布 →"
     : podiumStep < PODIUM_TOP
       ? `按空白鍵公布第 ${PODIUM_TOP - podiumStep} 名 →`
       : "按空白鍵看類別分析 →";
@@ -629,7 +649,7 @@ function paintFinal() {
   ];
 
   body.innerHTML = `
-    <h2 class="title-gold intro-title" style="margin:0 0 1vh;">★ 頒獎典禮 ★</h2>
+    <h2 class="title-gold intro-title" style="margin:0 0 .8vh;">★ 排行榜 ★</h2>
     <div class="podium">
       ${layout.map(({ rank, cls, medal }) => {
         const r = top[rank - 1];
@@ -670,7 +690,7 @@ function dropConfetti() {
 
 function paintMatrixScreen() {
   foot.textContent = "類別分析";
-  tip.textContent  = "← 按空白鍵回到頒獎台";
+  tip.textContent  = "← 按空白鍵回到排行榜";
 
   const mx = categoryMatrix(scoreboardNow());
   if (!mx.cats.length || !mx.rows.length) {

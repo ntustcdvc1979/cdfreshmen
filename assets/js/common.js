@@ -269,9 +269,10 @@ export function questionsOf(questions, list) {
 
 // ---------- 計分 ----------
 //
-//  每題每組最多拿到「配分 × 2」：
+//  每題每組最多拿到「配分 × 2」。兩筆分數互相獨立，各算各的：
 //    代表答對                        → +配分
 //    台下學員答對率 >= 50%           → +配分
+//  代表沒送出（或送錯）不影響學員那一分 —— 學員過半照樣加分。
 //  配分預設 1，可以逐題調整（後台的「配分」欄位）。
 //  排行榜就比總分。DEMO 題庫不計分。
 
@@ -314,6 +315,8 @@ export function tallyReps(repsForQuestion) {
 
 /**
  * 一組在一題上拿幾分。
+ * 代表那一分與學員那一分互不影響：代表沒作答時 repOk 為 false，
+ * 但 memberOk 完全由學員的答對率決定，照樣可以加分。
  * @returns { repChoice, repOk, memberTally, memberRate, memberOk, points }
  */
 export function scoreOne(key, repAnswer, memberByGroup, pts = DEFAULT_POINTS) {

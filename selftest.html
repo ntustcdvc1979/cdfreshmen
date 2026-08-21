@@ -58,6 +58,18 @@ ok("代表對 + 學員 33% → 1 分", s.points === 1 && s.repOk && !s.memberOk,
 s = scoreOne("A", null, null);
 ok("代表沒答 + 沒學員 → 0 分", s.points === 0 && s.repChoice === null && s.memberRate === null);
 
+// 這一條是規則的重點：兩筆分數互不影響
+s = scoreOne("A", null, {u1:{c:"A"},u2:{c:"A"},u3:{c:"B"}});
+ok("代表沒送出，學員 67% 過半 → 照樣 +1",
+   s.points === 1 && s.repChoice === null && s.memberOk === true, JSON.stringify({p:s.points,rate:s.memberRate}));
+
+s = scoreOne("A", null, {u1:{c:"A"},u2:{c:"B"}}, 4);
+ok("代表沒送出 + 加權 4 分題，學員剛好 50% → +4",
+   s.points === 4 && s.repOk === false, JSON.stringify({p:s.points}));
+
+s = scoreOne("A", {c:"B"}, {u1:{c:"A"},u2:{c:"A"}});
+ok("代表送錯也不影響學員那一分", s.points === 1 && !s.repOk && s.memberOk);
+
 s = scoreOne("A", {c:"A"}, null);
 ok("學員一個都沒答不給加分", s.points === 1 && s.memberOk === false, "rate=" + JSON.stringify(s.memberRate));
 
