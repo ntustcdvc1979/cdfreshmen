@@ -285,6 +285,12 @@ export function confirmed() {
   noise({ dur: 0.06, gain: 0.10, hp: 3000, at: 0.085 });
 }
 
+/** 有一組代表就位 —— 比「確認送出」輕，是報到不是定案 */
+export function joined() {
+  blip({ freq: 587, dur: 0.09, type: "sine", gain: 0.24 });
+  blip({ freq: 880, dur: 0.13, type: "sine", gain: 0.20, at: 0.07 });
+}
+
 /**
  * 時間到。
  * 刻意不用往下滑音 —— 下墜的音高聽起來像在嘲笑人，改成乾脆的一記撞擊：

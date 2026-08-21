@@ -413,6 +413,8 @@ table.rank { width: 100%; border-collapse: collapse; }
 table.rank th, table.rank td { padding: 10px 8px; text-align: left; border-bottom: 1px solid rgba(53,168,255,.25); }
 table.rank th { color: var(--cyan-lt); font-size: 13px; letter-spacing: .05em; }
 table.rank td { font-weight: 700; }
+/* 表頭要跟底下的數字一起靠右，不然標題和數字對不齊 */
+table.rank th.n { text-align: right; }
 table.rank td.n { text-align: right; font-variant-numeric: tabular-nums; color: var(--gold-lt); }
 table.rank tr.top1 td { color: var(--gold); font-size: 18px; }
 

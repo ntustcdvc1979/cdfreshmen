@@ -69,7 +69,7 @@ onAuthStateChanged(auth, async user => {
   onValue(ref(db, PATH.answerKey),   s => { keys      = s.val() || {}; paint(); });
   onValue(ref(db, PATH.responses),   s => { allResp   = s.val() || {}; paint(); });
   onValue(ref(db, PATH.leaderboard), s => { board     = s.val();       paint(); });
-  onValue(ref(db, PATH.reps),        s => { reps      = s.val() || {}; paint(); });
+  onValue(ref(db, PATH.reps),        s => { reps      = s.val() || {}; onReps(); paint(); });
   onValue(ref(db, PATH.repAnswers),  s => { repAns    = s.val() || {}; onRepAnswers(); paint(); });
   onValue(ref(db, PATH.state),       s => { state     = s.val() || {}; onStateChange(); paint(); });
 });
@@ -105,6 +105,16 @@ function onStateChange() {
 
   lastPhase = phase;
   lastQid = qid;
+}
+
+// 有新的組別代表就位就發出提示音（開場的掃碼頁最需要這個回饋）
+let knownReps = null;
+function onReps() {
+  const now = new Set(Object.keys(reps));
+  if (knownReps === null) { knownReps = now; return; }   // 第一次同步不叫
+  const fresh = [...now].filter(g => !knownReps.has(g));
+  knownReps = now;
+  if (fresh.length) snd.joined();
 }
 
 let seenReps = new Set();
@@ -279,24 +289,19 @@ function paintIntro() {
   return paintJoin();
 }
 
-/** 第一頁：六大主題（活動主視覺原圖） */
+/** 第一頁：六大主題。用從主視覺切出來的六張卡，一格一張。 */
 function paintThemes() {
+  // 卡片本身就有標題，不再另外加一行大字，六格才吃得到整個畫面高度
   body.innerHTML = `
-    <div class="fullimg">
-      <img src="assets/img/themes.jpg" alt="六大主題"
-           onerror="this.parentElement.innerHTML=window.__themesFallback">
+    <div class="themes">
+      ${CATEGORIES.map((c, i) => `
+        <div class="theme" style="--cat:${c.color}; animation-delay:${(i * 0.1).toFixed(2)}s">
+          <img src="assets/img/themes/${i + 1}.jpg" alt="${escapeHtml(c.name)}"
+               onerror="this.replaceWith(document.createRange().createContextualFragment(
+                 '<span class=&quot;fallback&quot;>${escapeHtml(c.name)}</span>'))">
+        </div>`).join("")}
     </div>`;
 }
-
-// 圖載不出來時的備援：用類別色重畫六張卡，不會開天窗
-window.__themesFallback = `
-  <div class="themes">
-    ${CATEGORIES.map((c, i) => `
-      <div class="theme" style="--cat:${c.color}">
-        <span class="num">${i + 1}</span>
-        <span class="nm">${escapeHtml(c.name)}</span>
-      </div>`).join("")}
-  </div>`;
 
 /** 第二頁：規則。後台沒放圖就用內建的流程示意圖。 */
 function paintRules() {
@@ -435,34 +440,30 @@ function paintPlay(qid, q, phase) {
 
   const left = secondsLeft(state.openedAt, state.limitSec || DEFAULT_LIMIT_SEC, timeOffset);
 
-  // 左邊題目與選項、右邊各組格子。分左右之後 ABCD 拿得到整欄寬度，字可以放大。
   body.innerHTML = `
-    <div class="playwrap">
-      <div class="qside">
+    <div class="qblock" id="s-qblock">
+      <div style="flex:1 1 auto; min-width:0;">
         <div class="big-q" id="s-bigq">${escapeHtml(q.text || "")}</div>
-        <div class="opt-list">
+        <div class="opt-row">
           ${LETTERS.filter(L => q[L.toLowerCase()]).map(L =>
-            `<div class="opt-line"><span class="k">${L}</span><span class="t">${escapeHtml(q[L.toLowerCase()])}</span></div>`
+            `<div class="opt-mini"><span class="k">${L}</span><span class="t">${escapeHtml(q[L.toLowerCase()])}</span></div>`
           ).join("")}
         </div>
       </div>
-      <div class="rside">
-        <div class="countdown" id="s-countdown">${locked ? 0 : (left ?? "–")}</div>
-        <div class="grid" id="s-grid"></div>
-      </div>
-    </div>`;
+      <div class="countdown" id="s-countdown">${locked ? 0 : (left ?? "–")}</div>
+    </div>
+    <div class="grid" id="s-grid"></div>`;
 
   if (!locked && left !== null) paintCountdown(left);
-  paintGrid(qid, false);
 
-  // 題幹與選項都縮到剛好塞得下，長題目也不會被切掉
-  const bq = $("#s-bigq");
-  fitToBox(bq, bq, "font-size", 4.2, 1.8);
-  // 要拿「整列」當量測對象 —— 拿文字自己量的話，文字盒子高度本來就等於內容，
-  // 永遠量不到溢出，反而會被邊界誤差騙到一路縮小。
-  for (const line of $(".opt-list").querySelectorAll(".opt-line")) {
-    fitToBox(line.querySelector(".t"), line, "font-size", 3.4, 1.6);
+  // 題目區塊有高度上限，剩下的都留給各組格子 —— 組數多的時候才不會擠成一團
+  const qb = $("#s-qblock");
+  fitToBox($("#s-bigq"), qb, "font-size", 4.2, 1.8);
+  for (const line of qb.querySelectorAll(".opt-mini")) {
+    fitToBox(line.querySelector(".t"), line, "font-size", 3, 1.5);
   }
+
+  paintGrid(qid, false);
 }
 
 function paintGrid(qid, revealMode) {
@@ -490,24 +491,29 @@ function paintGrid(qid, revealMode) {
         mark = c === key ? "✅" : "❌";
       }
     }
+    // 左邊組名、右邊答案
     const inner = c
       ? `<span class="glet">${showLetters ? c : "✓"}</span>`
       : `<span class="waiting">···</span>`;
     return `<div class="${cls.join(" ")}">
-      ${mark ? `<span class="mark">${mark}</span>` : ""}
-      ${inner}
       <span class="gname">${escapeHtml(g.name)}</span>
+      ${inner}
+      ${mark ? `<span class="mark">${mark}</span>` : ""}
     </div>`;
   }).join("");
 
   // 字級要從格子「實際拿到的高度」算 —— 出題畫面給整個下半部，
   // 公布畫面只給 26vh，用固定的 vh 公式會在公布畫面把內容切掉。
+  // 格子是橫的（組名左、答案右），所以字級主要由「格高」決定，
+  // 再用格寬把過長的組名擋下來。
   const cellH = el.clientHeight / rows;
   const cellW = el.clientWidth  / cols;
+  // 組名要跟答案共用同一列的寬度，所以兩邊都要留餘裕：
+  // 字母受格高限制、組名受格寬限制，上限壓低一點才不會被 ellipsis 切掉。
   el.style.setProperty("--cell-let",
-    Math.max(14, Math.min(cellH * 0.5, cellW * 0.42, 130)).toFixed(1) + "px");
+    Math.max(16, Math.min(cellH * 0.6, cellW * 0.26, 100)).toFixed(1) + "px");
   el.style.setProperty("--cell-name",
-    Math.max(10, Math.min(cellH * 0.2, cellW * 0.16, 28)).toFixed(1) + "px");
+    Math.max(11, Math.min(cellH * 0.34, cellW * 0.13, 32)).toFixed(1) + "px");
 
   if (!revealMode) {
     const done = Object.keys(repAns[qid] || {}).length;
