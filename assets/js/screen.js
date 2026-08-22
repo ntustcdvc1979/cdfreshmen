@@ -85,6 +85,9 @@ function onStateChange() {
   const qid   = state.qid || null;
   if (phase === lastPhase && qid === lastQid) return;
 
+  // 出題就把轉盤收掉 —— 在那之前它會一直留在畫面上
+  if (phase === PHASE.OPEN || qid !== lastQid) closeWheel();
+
   if (phase === PHASE.OPEN) {
     snd.stopBgm();
     snd.startBgm(state.limitSec || DEFAULT_LIMIT_SEC);
@@ -113,6 +116,10 @@ function onStateChange() {
 // ------------------------------------------------------------
 let lastWheelId = null;
 
+function closeWheel() {
+  document.querySelector(".wheel-overlay")?.remove();
+}
+
 function onWheel() {
   const w = state.wheel;
   if (!w || !w.id || w.id === lastWheelId) return;
@@ -140,7 +147,8 @@ function spinWheel(targetGid) {
         <g class="wheel-spin" id="wheel-spin">${wheelSvg(gl, seg)}</g>
       </svg>
     </div>
-    <div class="wheel-result pending" id="wheel-result">轉盤轉動中…</div>`;
+    <div class="wheel-result pending" id="wheel-result">轉盤轉動中…</div>
+    <p class="wheel-hint" id="wheel-hint"></p>`;
   stage.appendChild(ov);
 
   // 幾何：wheelSvg 從 -90°（12 點鐘）開始順時針排，
@@ -176,7 +184,8 @@ function spinWheel(targetGid) {
     res.className = "wheel-result";
     res.innerHTML = `<span class="who">${escapeHtml(gl[idx].name)}</span>
                      <span class="x2">下一題 ×2</span>`;
-    setTimeout(() => ov.remove(), 6000);
+    // 轉完就停在這裡，讓主持人有時間講話；等他按「出題／下一題」才收掉
+    ov.querySelector("#wheel-hint").textContent = "主持人按「下一題」就會關閉";
   }
   requestAnimationFrame(frame);
 }
@@ -199,7 +208,7 @@ function wheelSvg(gl, seg) {
               fill="${palette[i % 2]}" stroke="#ffc81f" stroke-width="0.8"/>
             <text x="${tx}" y="${ty}" fill="#fff" font-size="${fs}" font-weight="900"
               text-anchor="middle" dominant-baseline="central"
-              transform="rotate(${mid + 180} ${tx} ${ty})">${escapeHtml(g.name)}</text>`;
+              transform="rotate(${mid} ${tx} ${ty})">${escapeHtml(g.name)}</text>`;
   }).join("");
 }
 
@@ -227,6 +236,12 @@ function onRepAnswers() {
 //  鍵盤
 // ------------------------------------------------------------
 addEventListener("keydown", e => {
+  // 轉盤蓋著的時候先處理它：Esc 手動關掉，其餘按鍵不要穿透到底下的頁面
+  if (document.querySelector(".wheel-overlay")) {
+    if (e.key === "Escape") { e.preventDefault(); closeWheel(); }
+    return;
+  }
+
   const phase = state.phase || PHASE.IDLE;
 
   if (phase === PHASE.FINAL) {
