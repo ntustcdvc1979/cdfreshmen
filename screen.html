@@ -251,28 +251,16 @@
     grid-auto-rows: minmax(0, 1fr);
     gap: 2vh 2vw; flex: 1 1 auto; min-height: 0;
   }
-  /* 每一格放一張從主視覺切出來的卡片 */
+  /* 六大主題直接用整張主視覺；這組樣式只在圖載不出來時當備援 */
   .theme {
-    position: relative;
-    display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr);
-    place-items: center;
-    animation: theme-in .55s backwards cubic-bezier(.2,1.4,.4,1);
+    display: grid; place-items: center;
     min-width: 0; min-height: 0;
-  }
-  /* 八邊形去背：把四個角切掉，深藍底就不會露出來。
-     用 clip-path 而不是做透明 PNG —— 同樣效果，檔案小十倍。 */
-  .theme img {
-    max-width: 100%; max-height: 100%; object-fit: contain;
-    clip-path: polygon(4.8% 0, 95.2% 0, 100% 7%, 100% 93%,
-                       95.2% 100%, 4.8% 100%, 0 93%, 0 7%);
-    filter: drop-shadow(0 0 1.6vh rgba(0,0,0,.55));
   }
   .theme .fallback {
     font-size: 3.4vh; font-weight: 900; color: #fff; text-align: center;
     padding: 2vh 1.4vw; border-radius: 1.4vh;
     border: .4vh solid var(--cat); background: rgba(4,9,58,.9);
   }
-  @keyframes theme-in { from { opacity: 0; transform: translateY(3vh) scale(.92); } }
 
   .rules { display: flex; gap: 2.6vw; flex: 1 1 auto; min-height: 0; align-items: stretch; }
   .rules ol { flex: 1 1 auto; min-width: 0; margin: 0; padding-left: 1.3em;

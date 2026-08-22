@@ -143,10 +143,14 @@ function spinWheel(targetGid) {
     <div class="wheel-result pending" id="wheel-result">轉盤轉動中…</div>`;
   stage.appendChild(ov);
 
-  // 指針在 12 點鐘方向；要讓第 idx 格停在指針下，就把它的中心角轉到 -90°
+  // 幾何：wheelSvg 從 -90°（12 點鐘）開始順時針排，
+  // 所以第 i 格的中心在「順時針 i*seg + seg/2 度」的位置。
+  // CSS 的 rotate 正值也是順時針，轉了 R 之後中心會跑到 (centre + R)。
+  // 指針固定在 12 點鐘（0 度），要讓它落在目標格中心就得 centre + R ≡ 0，
+  // 也就是 R = 轉數*360 - centre。
   const centre = idx * seg + seg / 2;
   const turns  = 6;
-  const finalR = turns * 360 + (270 - centre);
+  const finalR = turns * 360 - centre;
   const dur    = 5200;
   const spin   = ov.querySelector("#wheel-spin");
   const t0     = performance.now();
@@ -377,19 +381,23 @@ function paintIntro() {
   return paintJoin();
 }
 
-/** 第一頁：六大主題。用從主視覺切出來的六張卡，一格一張。 */
+/** 第一頁：六大主題。直接用活動主視覺原圖。 */
 function paintThemes() {
-  // 卡片本身就有標題，不再另外加一行大字，六格才吃得到整個畫面高度
   body.innerHTML = `
-    <div class="themes">
-      ${CATEGORIES.map((c, i) => `
-        <div class="theme" style="--cat:${c.color}; animation-delay:${(i * 0.1).toFixed(2)}s">
-          <img src="assets/img/themes/${i + 1}.jpg" alt="${escapeHtml(c.name)}"
-               onerror="this.replaceWith(document.createRange().createContextualFragment(
-                 '<span class=&quot;fallback&quot;>${escapeHtml(c.name)}</span>'))">
-        </div>`).join("")}
+    <div class="fullimg">
+      <img src="assets/img/themes.jpg" alt="六大主題"
+           onerror="this.parentElement.innerHTML = window.__themesFallback">
     </div>`;
 }
+
+// 圖載不出來時的備援：用類別色重畫六張卡，不會開天窗
+window.__themesFallback = `
+  <div class="themes">
+    ${CATEGORIES.map((c, i) => `
+      <div class="theme" style="--cat:${c.color}">
+        <span class="fallback">${escapeHtml(c.name)}</span>
+      </div>`).join("")}
+  </div>`;
 
 /** 第二頁：規則。後台沒放圖就用內建的流程示意圖。 */
 function paintRules() {
@@ -403,9 +411,7 @@ function paintRules() {
         <li>代表看得到自己這組的 <b>即時選擇比例</b>，再決定最終答案。</li>
         <li>代表按下 <b>確認送出</b> —— 送出後不能更改，並立刻顯示在螢幕上。</li>
         <li>代表答對 <b>+1 分</b>。</li>
-        <li>台下學員答對率過半，<b>再 +1 分</b> ——
-            這一分是<b>獨立</b>的，就算代表來不及送出也照樣拿得到。</li>
-        <li>分數高的題目會在題號旁標示 <b>+N</b>，請注意把握。</li>
+        <li>台下學員答對率過半，<b>再 +1 分</b>。</li>
       </ol>
       <div class="pic">${img
         ? `<img src="${escapeHtml(img)}" alt="規則說明圖"
