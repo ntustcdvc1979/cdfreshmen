@@ -199,7 +199,7 @@ function wheelSvg(gl, seg) {
               fill="${palette[i % 2]}" stroke="#ffc81f" stroke-width="0.8"/>
             <text x="${tx}" y="${ty}" fill="#fff" font-size="${fs}" font-weight="900"
               text-anchor="middle" dominant-baseline="central"
-              transform="rotate(${mid + 90} ${tx} ${ty})">${escapeHtml(g.name)}</text>`;
+              transform="rotate(${mid + 180} ${tx} ${ty})">${escapeHtml(g.name)}</text>`;
   }).join("");
 }
 
@@ -428,11 +428,81 @@ function paintRules() {
         <li>代表答對 <b>+1 分</b>。</li>
         <li>台下學員答對率過半，<b>再 +1 分</b>。</li>
       </ol>
-      <div class="pic">${img
+      <div class="pic" id="s-rulepic">${img
         ? `<img src="${escapeHtml(img)}" alt="規則說明圖"
-             onerror="this.replaceWith(document.createRange().createContextualFragment(window.__ruleSvg))">`
-        : window.__ruleSvg}</div>
+             onerror="this.replaceWith(document.createRange().createContextualFragment(phoneMockHtml()))">`
+        : phoneMockHtml()}</div>
     </div>`;
+
+  fitPhones();
+}
+
+/**
+ * 規則頁的示意圖：直接用學員端真正的元件樣式組出兩支手機畫面，
+ * 所以跟他們手上看到的一模一樣，之後改樣式也會自動跟著變。
+ */
+function phoneMockHtml() {
+  const opts = [
+    ["A", "直接錄音存證"],
+    ["B", "找時間好好說"],
+    ["C", "貼紙條抗議"],
+    ["D", "跟幹部檢舉"]
+  ];
+  const optHtml = picked => opts.map(([L, t]) =>
+    `<div class="opt${L === picked ? " picked" : ""}">
+       <span class="letter">${L}</span><span class="label">${t}</span>
+     </div>`).join("");
+
+  const bars = [["A", 14], ["B", 57], ["C", 15], ["D", 14]].map(([L, p]) =>
+    `<div class="bar-row"><span class="bar-key">${L}</span>
+       <span class="bar-track"><span class="bar-fill" style="width:${p}%"></span></span>
+       <span class="bar-num">${p}%</span></div>`).join("");
+
+  return `
+    <div class="phones" id="s-phones">
+      <figure class="phone">
+        <figcaption>📱 台下學員</figcaption>
+        <div class="phone-screen">
+          <div class="qhead">
+            <span class="qbadge">第 <b>3</b> 題</span>
+            <span class="timer warn">18</span>
+          </div>
+          <div class="qpanel"><p>室友半夜一直講電話，最好的第一步是？</p></div>
+          <div class="opts">${optHtml("B")}</div>
+          <p class="hint" style="margin-top:10px;">已送出 B，截止前都可以改</p>
+        </div>
+      </figure>
+
+      <figure class="phone">
+        <figcaption>🎤 上台代表</figcaption>
+        <div class="phone-screen">
+          <div class="qhead">
+            <span class="qbadge">第 <b>3</b> 題</span>
+            <span class="timer warn">18</span>
+          </div>
+          <div class="card" style="margin-bottom:12px;">
+            <strong class="title-gold" style="font-size:15px;">學員的選擇</strong>
+            <div class="bars" style="margin-top:8px;">${bars}</div>
+          </div>
+          <div class="opts">${optHtml("B")}</div>
+          <button class="btn wide" style="margin-top:12px;">確認送出 <b>B</b></button>
+        </div>
+      </figure>
+    </div>`;
+}
+
+/** 兩支手機用原尺寸組好再整體縮到放得下，字級比例才不會跑掉 */
+function fitPhones() {
+  const wrap = $("#s-phones");
+  const box  = $("#s-rulepic");
+  if (!wrap || !box) return;
+  wrap.style.transform = "";
+  const w = wrap.scrollWidth, h = wrap.scrollHeight;
+  if (!w || !h) return;
+  const k = Math.min(box.clientWidth / w, box.clientHeight / h, 1);
+  wrap.style.transform = `scale(${k.toFixed(3)})`;
+  wrap.style.width  = w + "px";
+  wrap.style.height = h + "px";
 }
 
 /** 第三頁：QR Code + 各組代表就位狀況 */
@@ -499,46 +569,6 @@ async function paintQr() {
   }
 }
 
-// 內建的規則示意圖：後台沒放自己的圖時就用這張
-window.__ruleSvg = `
-<svg viewBox="0 0 420 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="遊戲流程示意">
-  <defs>
-    <linearGradient id="rg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2a5cff"/><stop offset="1" stop-color="#0a1b7a"/>
-    </linearGradient>
-    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
-      <path d="M0,0 L7,3 L0,6 Z" fill="#ffc81f"/>
-    </marker>
-  </defs>
-
-  <g font-family="Noto Sans TC, sans-serif" text-anchor="middle">
-    <rect x="14" y="18" width="170" height="86" rx="12" fill="url(#rg)" stroke="#35a8ff" stroke-width="2.5"/>
-    <text x="99" y="48" fill="#fff" font-size="19" font-weight="700">📱 台下學員</text>
-    <text x="99" y="74" fill="#a9bce8" font-size="14">各自選 A B C D</text>
-
-    <rect x="236" y="18" width="170" height="86" rx="12" fill="url(#rg)" stroke="#ffc81f" stroke-width="2.5"/>
-    <text x="321" y="48" fill="#fff" font-size="19" font-weight="700">🎤 上台代表</text>
-    <text x="321" y="74" fill="#ffe680" font-size="14">看比例、下決定</text>
-
-    <line x1="188" y1="61" x2="230" y2="61" stroke="#ffc81f" stroke-width="3" marker-end="url(#ar)"/>
-    <text x="209" y="50" fill="#ffc81f" font-size="11">比例</text>
-
-    <rect x="125" y="132" width="170" height="60" rx="12" fill="#0d2a14" stroke="#2fd96b" stroke-width="2.5"/>
-    <text x="210" y="169" fill="#7bffab" font-size="19" font-weight="700">✓ 確認送出</text>
-    <line x1="321" y1="108" x2="255" y2="128" stroke="#ffc81f" stroke-width="3" marker-end="url(#ar)"/>
-
-    <rect x="14" y="220" width="180" height="64" rx="12" fill="#241a02" stroke="#ffc81f" stroke-width="2.5"/>
-    <text x="104" y="246" fill="#ffe680" font-size="16" font-weight="700">代表答對</text>
-    <text x="104" y="270" fill="#ffc81f" font-size="20" font-weight="900">+1</text>
-
-    <rect x="226" y="220" width="180" height="64" rx="12" fill="#241a02" stroke="#ffc81f" stroke-width="2.5"/>
-    <text x="316" y="246" fill="#ffe680" font-size="16" font-weight="700">學員答對過半</text>
-    <text x="316" y="270" fill="#ffc81f" font-size="20" font-weight="900">+1</text>
-
-    <line x1="180" y1="196" x2="120" y2="214" stroke="#ffc81f" stroke-width="3" marker-end="url(#ar)"/>
-    <line x1="240" y1="196" x2="300" y2="214" stroke="#ffc81f" stroke-width="3" marker-end="url(#ar)"/>
-  </g>
-</svg>`;
 
 // ============================================================
 //  出題中
