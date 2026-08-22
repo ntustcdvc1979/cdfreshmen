@@ -362,7 +362,6 @@ $("#btn-confirm").addEventListener("click", async () => {
   if (!isRep() || !qid || !pending) return;
   if (myRepAnswer?.c) { toast("已經送出了"); return; }
   if (state?.phase !== PHASE.OPEN) { toast("已截止作答"); return; }
-  if (!confirm(`確定送出 ${pending}？送出後就不能更改，並且會顯示在投影幕上。`)) return;
 
   try {
     await set(ref(db, `${PATH.repAnswers}/${qid}/${myGroup}`), {

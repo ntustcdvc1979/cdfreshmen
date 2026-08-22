@@ -160,7 +160,11 @@ function spinWheel(targetGid) {
     const p = Math.min(1, (now - t0) / dur);
     const eased = 1 - Math.pow(1 - p, 4);          // ease-out：先快後慢
     const r = finalR * eased;
-    spin.style.transform = `rotate(${r}deg)`;
+    // 用 SVG 的 transform 屬性，不要用 CSS transform ——
+    // CSS 的 transform-origin: 50% 50% 在 <g> 上會解析成使用者座標 (105,105)，
+    // 不是圓心 (0,0)，整個轉盤會繞著偏移點公轉而不是自轉。
+    // SVG 的 rotate(deg) 不帶 cx,cy 時就是繞使用者原點，剛好是圓心。
+    spin.setAttribute("transform", `rotate(${r})`);
 
     const segIdx = Math.floor(r / seg);
     if (segIdx !== lastSeg) { lastSeg = segIdx; snd.wheelTick(); }
@@ -605,10 +609,11 @@ function paintGrid(qid, revealMode) {
       : `<span class="waiting">···</span>`;
     // ×2 只用紅框標示，不在格子裡放文字 —— 組名本來就快撐滿，
     // 再插一個 chip 會把「第 13 組」擠成「第…×2」
+    if (revealMode) cls.push("revealed");
     return `<div class="${cls.join(" ")}">
       <span class="gname">${escapeHtml(g.name)}</span>
       ${inner}
-      ${mark ? `<span class="mark">${mark}</span>` : ""}
+      <span class="mark">${mark}</span>
     </div>`;
   }).join("");
 
@@ -622,8 +627,23 @@ function paintGrid(qid, revealMode) {
   // 字母受格高限制、組名受格寬限制，上限壓低一點才不會被 ellipsis 切掉。
   el.style.setProperty("--cell-let",
     Math.max(16, Math.min(cellH * 0.6, cellW * 0.26, 100)).toFixed(1) + "px");
-  el.style.setProperty("--cell-name",
-    Math.max(11, Math.min(cellH * 0.34, cellW * 0.13, 32)).toFixed(1) + "px");
+  const nameSize = Math.max(11, Math.min(cellH * 0.34, cellW * 0.13, 32));
+  el.style.setProperty("--cell-name", nameSize.toFixed(1) + "px");
+
+  // 公布時三欄等分，組名那欄會變窄。與其猜一個縮放係數，直接量到不溢出為止 ——
+  // 組數、欄數、組名長度都會變，算的不準。
+  if (revealMode) {
+    const names = [...el.querySelectorAll(".gname")];
+    let f = 0.8;
+    const apply = () => el.style.setProperty("--cell-name-rev",
+      Math.max(9, nameSize * f).toFixed(1) + "px");
+    apply();
+    for (let i = 0; i < 16 && nameSize * f > 9; i++) {
+      if (!names.some(n => n.scrollWidth > n.clientWidth + 1)) break;
+      f -= 0.04;
+      apply();
+    }
+  }
 
   if (!revealMode) {
     const done = Object.keys(repAns[qid] || {}).length;
