@@ -358,6 +358,19 @@ function paint() {
   $("#s-pts").textContent = "+" + pts;
   $("#s-pts").style.display = showPts ? "" : "none";
 
+  // 加倍的組別放在頂部列，格子裡只留紅框
+  const dblGid = onQuestion ? doubles[qid] : (phase === PHASE.IDLE ? null : null);
+  const dblEl = $("#s-dbl");
+  if (dblGid && groups[dblGid]) {
+    dblEl.textContent = "🎡 " + groups[dblGid].name + " ×2";
+    dblEl.style.display = "";
+  } else {
+    dblEl.style.display = "none";
+  }
+
+  // 六大主題那一頁要滿版，頂部列與頁尾都收起來
+  stage.classList.toggle("bleed", phase === PHASE.IDLE && introPage === 0);
+
   tip.textContent = "";
   stage.querySelector(".confetti")?.remove();
 
@@ -381,13 +394,11 @@ function paintIntro() {
   return paintJoin();
 }
 
-/** 第一頁：六大主題。直接用活動主視覺原圖。 */
+/** 第一頁：六大主題。整張主視覺直接滿版鋪滿投影畫面。 */
 function paintThemes() {
   body.innerHTML = `
-    <div class="fullimg">
-      <img src="assets/img/themes.jpg" alt="六大主題"
-           onerror="this.parentElement.innerHTML = window.__themesFallback">
-    </div>`;
+    <img class="bleed-img" src="assets/img/themes.jpg" alt="六大主題"
+         onerror="this.outerHTML = '<div class=&quot;themes&quot;>' + window.__themesFallback + '</div>'">`;
 }
 
 // 圖載不出來時的備援：用類別色重畫六張卡，不會開天窗
@@ -592,9 +603,10 @@ function paintGrid(qid, revealMode) {
     const inner = c
       ? `<span class="glet">${showLetters ? c : "✓"}</span>`
       : `<span class="waiting">···</span>`;
+    // ×2 只用紅框標示，不在格子裡放文字 —— 組名本來就快撐滿，
+    // 再插一個 chip 會把「第 13 組」擠成「第…×2」
     return `<div class="${cls.join(" ")}">
       <span class="gname">${escapeHtml(g.name)}</span>
-      ${g.id === doubledGid ? `<span class="x2tag">×2</span>` : ""}
       ${inner}
       ${mark ? `<span class="mark">${mark}</span>` : ""}
     </div>`;

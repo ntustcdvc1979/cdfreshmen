@@ -73,10 +73,14 @@ function attach() {
 
 function syncFromState() {
   if (state.list && state.list !== curList) { curList = state.list; paintQuestionSelect(); }
-  if (state.qid && state.qid !== curQid) {
+  // 這裡不能拿 curQid 當守門員 —— openQuestion() 會先把 curQid 設好再寫進資料庫，
+  // 等狀態回來時兩者早就一樣了，下拉選單就永遠不會更新。直接照 state.qid 對齊。
+  if (state.qid) {
     curQid = state.qid;
-    const opt = $("#sel-q").querySelector(`option[value="${CSS.escape(curQid)}"]`);
-    if (opt) $("#sel-q").value = curQid;
+    const sel = $("#sel-q");
+    if (sel.value !== curQid && sel.querySelector(`option[value="${CSS.escape(curQid)}"]`)) {
+      sel.value = curQid;
+    }
   }
   $("#sel-list").value        = curList;
   $("#in-limit").value        = state.limitSec ?? DEFAULT_LIMIT_SEC;
@@ -170,6 +174,10 @@ async function openQuestion(qid) {
   if (!qid) { toast("請先選擇題目"); return; }
   curQid = qid;
   autoLocked = null;
+  {
+    const sel = $("#sel-q");
+    if (sel.querySelector(`option[value="${CSS.escape(qid)}"]`)) sel.value = qid;
+  }
 
   // 轉盤抽到的加倍在這裡蓋章到這一題，然後就用掉了
   const dbl = state.pendingDouble || null;

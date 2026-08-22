@@ -43,6 +43,17 @@
 
   .body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 2vh; min-height: 0; }
 
+  /* 六大主題那一頁：整張圖鋪滿投影畫面，連頂部列與頁尾都收起來 */
+  .stage.bleed { padding: 0; }
+  .stage.bleed .top,
+  .stage.bleed .foot { display: none; }
+  .stage.bleed .body { gap: 0; }
+  .bleed-img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
   .foot { display: flex; align-items: center; justify-content: space-between; gap: 2vw;
           color: var(--txt-dim); font-size: 2vh; flex: 0 0 auto; }
   .foot b { color: var(--gold); }
@@ -179,7 +190,13 @@
   .cellbox.right  .gname { color: #9dffc4; }
   .cellbox.wrongc { border-color: rgba(255,84,112,.55); opacity: .62; }
   .cellbox.wrongc .glet { color: #ff8497; background: none; -webkit-text-fill-color: #ff8497; }
-  .cellbox .mark { flex: 0 0 auto; font-size: calc(var(--cell-name, 2.4vh) * .95); }
+  /* ✅/❌ 用絕對定位貼在角落 —— 當成 flex 項目會跟組名搶寬度，
+     公布答案時組名就會被 ellipsis 切掉 */
+  .cellbox .mark {
+    position: absolute; top: .2vh; right: .35vw;
+    font-size: calc(var(--cell-name, 2.4vh) * .62);
+    line-height: 1; pointer-events: none;
+  }
 
   /* ---------- 公布答案 ---------- */
   .reveal-top { display: flex; gap: 2vw; align-items: stretch; flex: 1 1 auto; min-height: 0; }
@@ -397,13 +414,18 @@
   @keyframes x2-pop { from { transform: scale(.4); } to { transform: scale(1); } }
   .wheel-result.pending { color: var(--txt-dim); font-size: 3vh; }
 
-  /* 出題時標示這一題被加倍的組 */
-  .cellbox.doubled { border-color: #ff5470; box-shadow: 0 0 2.6vh rgba(255,84,112,.7); }
-  .cellbox .x2tag {
-    flex: 0 0 auto;
-    font-size: calc(var(--cell-name, 2.4vh) * .9); font-weight: 900; color: #fff;
-    padding: .1vh .5vw; border-radius: 999px;
+  /* 這一題被加倍的組：格子只用紅框標示，文字放在頂部列，
+     否則「第 13 組」這種組名會被 chip 擠成「第…×2」 */
+  .cellbox.doubled {
+    border-color: #ff5470;
+    box-shadow: 0 0 2.6vh rgba(255,84,112,.7), inset 0 0 2vh rgba(255,84,112,.18);
+  }
+  .dbl-pill {
+    display: inline-flex; align-items: center;
+    font-size: 2.8vh; font-weight: 900; line-height: 1; color: #fff;
+    padding: 1vh 1.8vw; border-radius: 999px; white-space: nowrap;
     background: linear-gradient(180deg, #ff7a90, #cc1f3d);
+    box-shadow: 0 0 2.4vh rgba(255,84,112,.75);
   }
 
   /* ---------- 音效解鎖 ---------- */
@@ -424,6 +446,7 @@
     <img class="logo" src="assets/img/logo.png" alt="大學星攻略">
     <span class="cat-pill" id="s-cat">—</span>
     <span class="pts-badge" id="s-pts">+1</span>
+    <span class="dbl-pill" id="s-dbl">🎡 ×2</span>
     <span class="qbadge" id="s-badge">第 <b>–</b> 題</span>
   </div>
 
