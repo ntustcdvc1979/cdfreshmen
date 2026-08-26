@@ -7,7 +7,7 @@ import {
   buildScoreboard, categoryMatrix, categoryChampions, groupBestCategories, columnWinners,
   scoreOne, tallyMembers, tallyAllMembers, tallyReps, categoryOf, parseBulkQuestions,
   questionsOf, listOf, gridColumns, secondsLeft, ptsOf, LISTS,
-  blocksOf, normalizeBlock, groupBlocks
+  blocksOf, normalizeBlock, groupBlocks, videoEmbed, isSoloMedia
 } from "./assets/js/common.js";
 
 const log = [];
@@ -220,7 +220,7 @@ ok("空區塊會補上預設值", nb.t === "text" && nb.w === "full" && nb.size 
    JSON.stringify(nb));
 nb = normalizeBlock({ t: "img", v: "u", w: "half", size: 5, align: "center" });
 ok("完整區塊原樣保留", nb.t === "img" && nb.w === "half" && nb.size === 5 && nb.align === "center");
-ok("不合法的型別退回文字", normalizeBlock({ t: "video" }).t === "text");
+ok("不合法的型別退回文字", normalizeBlock({ t: "audio" }).t === "text");
 ok("不合法的寬度退回整行", normalizeBlock({ w: "third" }).w === "full");
 ok("超出範圍的大小退回 3",
    normalizeBlock({ size: 9 }).size === 3 && normalizeBlock({ size: 0 }).size === 3
@@ -270,6 +270,31 @@ ok("半行區塊各自成列（維持原本的 49% 並排）",
    R.length === 2 && !R[0].auto && !R[1].auto);
 
 ok("沒有區塊時分列結果是空的", groupBlocks([]).length === 0);
+// ---- 8d. 影片區塊 ----
+ok("影片是合法的型別", normalizeBlock({ t: "video" }).t === "video");
+const VE = u => videoEmbed(u);
+ok("YouTube watch 轉成內嵌網址",
+   VE("https://www.youtube.com/watch?v=dQw4w9WgXcQ").src === "https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0");
+ok("youtu.be 短網址也認得", VE("https://youtu.be/abc123XYZ").src.endsWith("/embed/abc123XYZ?rel=0"));
+ok("shorts 也認得", VE("https://www.youtube.com/shorts/Zz9_-9xK1aQ").src.endsWith("/embed/Zz9_-9xK1aQ?rel=0"));
+ok("v= 不在第一個參數也抓得到",
+   VE("https://youtube.com/watch?list=PL1&v=kJQP7kiw5Fk").src.endsWith("/embed/kJQP7kiw5Fk?rel=0"),
+   VE("https://youtube.com/watch?list=PL1&v=kJQP7kiw5Fk").src);
+ok("Vimeo 轉成內嵌網址", VE("https://vimeo.com/123456789").src === "https://player.vimeo.com/video/123456789");
+ok("mp4 檔案原樣當成檔案播放",
+   VE("assets/video/x.mp4").kind === "file" && VE("assets/video/x.mp4").src === "assets/video/x.mp4");
+ok("空網址不會爆", VE("").kind === "file" && VE("").src === "");
+ok("非影片網站當成檔案", VE("https://example.com/a.webm").kind === "file");
+
+// ---- 8e. 只有一張圖／一段影片 → 佔滿說明區 ----
+const NB = a => a.map(normalizeBlock);
+ok("只有一張圖 → 佔滿", isSoloMedia(NB([{ t:"img", v:"a.png" }])));
+ok("只有一段影片 → 佔滿", isSoloMedia(NB([{ t:"video", v:"https://youtu.be/abc123" }])));
+ok("圖片配文字 → 不佔滿", !isSoloMedia(NB([{ t:"img", v:"a.png" }, { t:"text", v:"說明" }])));
+ok("兩張圖 → 不佔滿", !isSoloMedia(NB([{ t:"img", v:"a.png" }, { t:"img", v:"b.png" }])));
+ok("只有一段文字 → 不佔滿", !isSoloMedia(NB([{ t:"text", v:"只有字" }])));
+ok("沒有區塊 → 不佔滿", !isSoloMedia([]));
+
 ok("分列不會漏掉或多出區塊", (() => {
   const src = N([{t:"img",v:"1",w:"auto"},{t:"img",v:"2",w:"auto"},{t:"text",v:"3"},
                  {t:"img",v:"4",w:"auto"},{t:"text",v:"5",w:"half"}]);

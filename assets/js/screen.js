@@ -10,7 +10,7 @@ import {
   db, auth, ref, onValue, onAuthStateChanged,
   PATH, PHASE, LISTS, LETTERS, DEFAULT_LIMIT_SEC, CATEGORIES,
   categoryOf, questionsOf, tallyAllMembers, secondsLeft, isHost, ptsOf,
-  blocksOf, groupBlocks, TEXT_SIZE_VH, IMG_SIZE_VH,
+  blocksOf, groupBlocks, isSoloMedia, videoEmbed, TEXT_SIZE_VH, IMG_SIZE_VH,
   gridColumns, buildScoreboard, categoryMatrix, groupBestCategories, columnWinners,
   $, show, escapeHtml, toSortedList
 } from "./common.js";
@@ -144,7 +144,7 @@ function spinWheel(targetGid) {
   const ov = document.createElement("div");
   ov.className = "wheel-overlay";
   ov.innerHTML = `
-    <h2 class="title-gold">🎡 分數加倍轉盤 🎡</h2>
+    <h2 class="title-gold"><span class="emoji">🎡</span> 分數加倍轉盤 <span class="emoji">🎡</span></h2>
     <div class="wheel-stage">
       <div class="wheel-ptr"></div>
       <div class="wheel-hub">×2</div>
@@ -725,12 +725,12 @@ function paintReveal(qid, q) {
   body.innerHTML = `
     <div class="reveal-top">
       <div class="reveal-ans">
-        <div class="title-gold" style="font-size:2.8vh;">🎉 正確答案 🎉</div>
+        <div class="title-gold" style="font-size:2.8vh;"><span class="emoji">🎉</span> 正確答案 <span class="emoji">🎉</span></div>
         <div class="reveal-letter">${key || "—"}</div>
       </div>
       <div class="reveal-ex">
-        <h3 class="title-gold" style="font-size:3vh; margin:0 0 1vh;">💡 說明</h3>
-        <div class="exblocks" id="s-exblocks">${blocksHtml(q)}</div>
+        <h3 class="title-gold" style="font-size:3vh; margin:0 0 1vh;"><span class="emoji">💡</span> 說明</h3>
+        <div class="exblocks${isSoloMedia(blocksOf(q)) ? " solo" : ""}" id="s-exblocks">${blocksHtml(q)}</div>
       </div>
     </div>
     <div class="grid" id="s-grid" style="flex:0 0 26vh;"></div>`;
@@ -755,6 +755,16 @@ function blocksHtml(q) {
         style="--ih:${IMG_SIZE_VH[b.size]}vh"
         onerror="this.replaceWith(Object.assign(document.createElement('span'),
           {className:'imgfail', textContent:'圖片載不出來'}))"></div>`;
+    }
+    if (b.t === "video") {
+      const v = videoEmbed(b.v);
+      const inner = v.kind === "embed"
+        ? `<iframe src="${escapeHtml(v.src)}" title="說明影片" frameborder="0"
+             allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
+             allowfullscreen></iframe>`
+        : `<video src="${escapeHtml(v.src)}" controls playsinline preload="metadata"></video>`;
+      return `<div class="${cls}"><div class="vidbox"
+        style="--ih:${IMG_SIZE_VH[b.size]}vh">${inner}</div></div>`;
     }
     const tag = b.t === "head" ? "h4" : "p";
     return `<${tag} class="${cls} ${b.t}"
@@ -819,7 +829,7 @@ function paintStandings(qid) {
   const done = qIndex(qid) + 1;
 
   body.innerHTML = `
-    <h2 class="title-gold intro-title" style="margin:0 0 .6vh;">⚡ 目前戰況 ⚡</h2>
+    <h2 class="title-gold intro-title" style="margin:0 0 .6vh;"><span class="emoji">⚡</span> 目前戰況 <span class="emoji">⚡</span></h2>
     <p class="hint center" style="font-size:2.3vh; margin:0 0 2vh;">已完成 ${done} 題　顯示前 ${STANDINGS_TOP} 名</p>
     <div class="card" style="overflow:hidden;">
       <table class="rank rank-screen">

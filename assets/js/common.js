@@ -164,10 +164,14 @@ export const UNCATEGORIZED = { id: "uncat", name: "未分類", color: "#7b8bb5" 
 // ---------- 說明頁排版區塊 ----------
 
 export const BLOCK_TYPES = [
-  { t: "head", name: "小標題" },
-  { t: "text", name: "文字" },
-  { t: "img",  name: "圖片" }
+  { t: "head",  name: "小標題" },
+  { t: "text",  name: "文字" },
+  { t: "img",   name: "圖片" },
+  { t: "video", name: "影片" }
 ];
+
+/** 會佔版面的媒體類型 —— 只有一個的時候讓它佔滿整個說明區 */
+export const MEDIA_TYPES = ["img", "video"];
 
 export const BLOCK_SIZES = [1, 2, 3, 4, 5];
 
@@ -192,7 +196,7 @@ export const IMG_SIZE_VH  = { 1: 9,   2: 14,  3: 19,  4: 25,  5: 32  };
 
 /** 把一個區塊補齊預設值 */
 export function normalizeBlock(b) {
-  const t = ["text", "img", "head"].includes(b?.t) ? b.t : "text";
+  const t = ["text", "img", "head", "video"].includes(b?.t) ? b.t : "text";
   const size = BLOCK_SIZES.includes(Math.round(Number(b?.size)))
     ? Math.round(Number(b.size)) : DEFAULT_BLOCK_SIZE;
   return {
@@ -202,6 +206,28 @@ export function normalizeBlock(b) {
     size,
     align: ["center", "right"].includes(b?.align) ? b.align : "left"
   };
+}
+
+/**
+ * 影片網址 → 實際要放進畫面的來源。
+ * YouTube／Vimeo 轉成內嵌網址（要用 iframe），其他一律當成直接播放的影片檔。
+ * 注意：內嵌的影片需要現場有網路，沒網路的場地請改放 mp4 檔。
+ */
+export function videoEmbed(url) {
+  const u = (url || "").trim();
+  if (!u) return { kind: "file", src: "" };
+  const yt = u.match(
+    /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|live\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/
+  );
+  if (yt) return { kind: "embed", src: `https://www.youtube.com/embed/${yt[1]}?rel=0` };
+  const vi = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vi) return { kind: "embed", src: `https://player.vimeo.com/video/${vi[1]}` };
+  return { kind: "file", src: u };
+}
+
+/** 說明只有一張圖或一段影片時 → 讓它佔滿整個說明區 */
+export function isSoloMedia(blocks) {
+  return blocks.length === 1 && MEDIA_TYPES.includes(blocks[0].t);
 }
 
 /**

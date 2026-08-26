@@ -204,6 +204,8 @@
   .cellbox .mark {
     font-size: calc(var(--cell-name, 2.4vh) * .8);
     line-height: 1; white-space: nowrap;
+    /* 用系統的彩色 emoji 字型，中文字型的單色版本在投影幕上分不出來 */
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   }
   .cellbox .mark:empty { display: none; }
 
@@ -242,6 +244,32 @@
   .exrow.right  { justify-content: flex-end; }
   .exrow .exblock { flex: 0 1 auto; min-width: 0; }
   .exrow img { display: block; }
+
+  /* 影片：固定 16:9，高度跟圖片用同一組級距 */
+  .vidbox {
+    height: calc(var(--ih, 19vh) * var(--blk-scale, 1));
+    aspect-ratio: 16 / 9; max-width: 100%;
+    border-radius: 1vh; overflow: hidden;
+    box-shadow: 0 0 0 .25vh rgba(255,200,31,.35), 0 1vh 3vh rgba(0,0,0,.55);
+    background: #000;
+  }
+  .exblock.center .vidbox { margin: 0 auto; }
+  .exblock.right  .vidbox { margin-left: auto; }
+  .vidbox iframe, .vidbox video { width: 100%; height: 100%; border: 0; display: block; }
+
+  /* 說明只有一張圖（或一段影片）時就讓它佔滿整個說明區。
+     flex-wrap 要改成 nowrap，align-self:stretch 才會真的把那一格撐開 */
+  .exblocks.solo { flex-wrap: nowrap; align-content: stretch; }
+  .exblocks.solo .exblock {
+    flex: 1 1 auto; min-width: 0; min-height: 0; align-self: stretch;
+  }
+  .exblocks.solo .exblock img {
+    width: 100%; height: 100%;
+    max-width: none; max-height: none; object-fit: contain;
+  }
+  .exblocks.solo .vidbox {
+    width: 100%; height: 100%; aspect-ratio: auto; max-width: none;
+  }
 
   /* 字級與圖高都由 --fs / --ih 帶進來，再乘上整體縮放係數 ——
      這樣「排太滿就整頁縮小」不需要動到每一個 inline style */
@@ -409,7 +437,8 @@
   .place.shown { animation: place-rise .85s cubic-bezier(.16,1.2,.3,1) forwards; }
   @keyframes place-rise { to { opacity: 1; transform: translateY(0); } }
 
-  .place .medal { font-size: 7.4vh; line-height: 1; margin-bottom: .5vh; }
+  .place .medal { font-size: 7.4vh; line-height: 1; margin-bottom: .5vh;
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
   .place .gname { font-size: 6.8vh; font-weight: 900; line-height: 1.08; text-align: center;
                   margin-bottom: .6vh; max-width: 100%; }
   .place .score { font-size: 5.2vh; font-weight: 900; margin-bottom: .4vh; color: var(--gold-lt); }

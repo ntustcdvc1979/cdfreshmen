@@ -7,7 +7,8 @@ import {
   signInWithGoogle, consumeRedirectResult, authErrorText, signOut, onAuthStateChanged,
   PATH, LETTERS, CATEGORIES, UNCATEGORIZED, LISTS, LIST_LABEL,
   categoryOf, listOf, questionsOf, parseBulkQuestions, ptsOf,
-  blocksOf, groupBlocks, normalizeBlock, BLOCK_TYPES, BLOCK_SIZES, DEFAULT_BLOCK_SIZE,
+  blocksOf, groupBlocks, isSoloMedia, videoEmbed, normalizeBlock,
+  BLOCK_TYPES, BLOCK_SIZES, DEFAULT_BLOCK_SIZE,
   BLOCK_WIDTHS, BLOCK_ALIGNS,
   TEXT_SIZE_VH, IMG_SIZE_VH,
   $, show, toast, toSortedList, escapeHtml, isHost, notHostHtml
@@ -60,6 +61,7 @@ const BLOCK_LABEL = Object.fromEntries(BLOCK_TYPES.map(b => [b.t, b.name]));
 $("#blk-add-head").addEventListener("click", () => addBlock("head"));
 $("#blk-add-text").addEventListener("click", () => addBlock("text"));
 $("#blk-add-img").addEventListener("click",  () => addBlock("img"));
+$("#blk-add-video").addEventListener("click", () => addBlock("video"));
 
 function addBlock(t) {
   edBlocks.push(normalizeBlock({ t, v: "", w: "full", size: t === "head" ? 4 : DEFAULT_BLOCK_SIZE }));
@@ -90,6 +92,8 @@ function paintBlocks() {
       </div>
       ${b.t === "img"
         ? `<input class="blk-v" value="${escapeHtml(b.v)}" placeholder="https://… 或 assets/img/explain/檔名.png">`
+        : b.t === "video"
+        ? `<input class="blk-v" value="${escapeHtml(b.v)}" placeholder="YouTube／Vimeo 網址，或 assets/video/檔名.mp4">`
         : `<textarea class="blk-v" placeholder="${b.t === "head" ? "小標題文字" : "說明內容，可以換行"}">${escapeHtml(b.v)}</textarea>`}
     </div>`).join("")
     || `<p class="hint" style="text-align:left;">還沒有任何區塊。用下面的按鈕加一個。</p>`;
@@ -142,13 +146,22 @@ function paintBlockPreview() {
     const cls = `exblock ${b.w} ${b.align}`;
     if (b.t === "img") {
       return `<div class="${cls}"><img src="${escapeHtml(b.v)}" alt=""
-        style="max-height:${(IMG_SIZE_VH[b.size] * k).toFixed(1)}vh"></div>`;
+        style="--ih:${(IMG_SIZE_VH[b.size] * k).toFixed(1)}vh"></div>`;
+    }
+    if (b.t === "video") {
+      const v = videoEmbed(b.v);
+      const inner = v.kind === "embed"
+        ? `<iframe src="${escapeHtml(v.src)}" title="說明影片" frameborder="0" allowfullscreen></iframe>`
+        : `<video src="${escapeHtml(v.src)}" controls preload="metadata"></video>`;
+      return `<div class="${cls}"><div class="vidbox"
+        style="--ih:${(IMG_SIZE_VH[b.size] * k).toFixed(1)}vh">${inner}</div></div>`;
     }
     const tag = b.t === "head" ? "h4" : "p";
     return `<${tag} class="${cls} ${b.t}" style="margin:0; font-size:${
       (TEXT_SIZE_VH[b.size] * k).toFixed(2)}vh">${escapeHtml(b.v)}</${tag}>`;
   };
-  box.innerHTML = `<div class="exblocks">${groupBlocks(live.map(normalizeBlock)).map(r => r.auto
+  const norm = live.map(normalizeBlock);
+  box.innerHTML = `<div class="exblocks${isSoloMedia(norm) ? " solo" : ""}">${groupBlocks(norm).map(r => r.auto
     ? `<div class="exrow ${r.align}">${r.items.map(one).join("")}</div>`
     : one(r.items[0])
   ).join("")}</div>`;
@@ -273,6 +286,7 @@ function paintQuestions() {
     const blks  = blocksOf(q);
     const hasEx = blks.length > 0 || !!(q.exImgFull || "").trim();
     const nImg  = blks.filter(b => b.t === "img").length;
+    const nVid  = blks.filter(b => b.t === "video").length;
     return `
     <div class="qitem ${editing === q.id ? "editing" : ""}" data-qid="${escapeHtml(q.id)}">
       <div class="head">
@@ -284,7 +298,7 @@ function paintQuestions() {
         <span class="cat-pill" style="--cat:${cat.color}">${escapeHtml(cat.name)}</span>
         ${ptsOf(q) !== 1 ? `<span class="flag ok">配分 +${ptsOf(q)}</span>` : ""}
         <span class="flag ${hasEx ? "ok" : "warn"}">${hasEx ? "有說明" : "⚠ 沒有說明"}</span>
-        ${blks.length ? `<span class="flag">${blks.length} 個區塊${nImg ? `・${nImg} 圖` : ""}</span>` : ""}
+        ${blks.length ? `<span class="flag">${blks.length} 個區塊${nImg ? `・${nImg} 圖` : ""}${nVid ? `・${nVid} 影片` : ""}</span>` : ""}
         ${(q.exImgFull || "").trim() ? `<span class="flag">含整頁大圖</span>` : ""}
       </div>
       <div class="row" style="margin-top:10px;">

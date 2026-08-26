@@ -475,7 +475,25 @@ table.matrix td small { display: block; font-size: 11px; font-weight: 600; opaci
 .pill.lock { background: rgba(255,84,112,.15); border-color: var(--bad); color: #ffa5b4; }
 
 .spacer { flex: 1 1 auto; }
-.stack  { display: grid; gap: 12px; }
+/* minmax(0,1fr) 是必要的：預設 grid 項目的 min-width 是 auto，
+   一行不換行的長題幹會把整欄撐到超過 .wrap，整頁就多出橫向捲軸、看起來偏左 */
+.stack  { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+
+/* 金色標題是 background-clip:text + color:transparent 的漸層，
+   彩色 emoji 夾在裡面會連同字一起被裁成金色色塊，看不出原本是什麼。
+   包一層 .emoji 就能跳出漸層，並指定系統內建的彩色 emoji 字型。 */
+.emoji {
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: var(--gold-lt);
+  -webkit-text-fill-color: currentColor;
+  text-shadow: none;
+  filter: none;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0;
+}
 .row    { display: flex; gap: 10px; flex-wrap: wrap; }
 .hidden { display: none !important; }
 
