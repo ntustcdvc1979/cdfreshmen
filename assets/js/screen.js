@@ -742,7 +742,7 @@ function paintReveal(qid, q) {
 function blocksHtml(q) {
   const blocks = blocksOf(q);
   if (!blocks.length) {
-    return `<p class="hint" style="font-size:2.4vh;">（這一題後台還沒有填說明）</p>`;
+    return `<p class="hint" style="font-size:2.4vh;"></p>`;
   }
   return blocks.map(b => {
     const cls = `exblock ${b.w} ${b.align}`;

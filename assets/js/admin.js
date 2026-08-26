@@ -130,7 +130,7 @@ function paintBlockPreview() {
   const box = $("#ed-blkpreview");
   const live = edBlocks.filter(b => (b.v || "").trim());
   if (!live.length) {
-    box.innerHTML = `<p class="empty">還沒有內容 —— 投影幕上會顯示「這一題後台還沒有填說明」</p>`;
+    box.innerHTML = `<p class="empty">還沒有內容</p>`;
     return;
   }
   // 預覽框比投影幕小，字級等比例縮小
