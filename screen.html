@@ -228,6 +228,22 @@
   .exblock.half { flex: 0 0 49%; }
   .exblock.center { text-align: center; }
   .exblock.left   { text-align: left; }
+  .exblock.right  { text-align: right; }
+  .exblock.auto   { flex: 0 1 auto; }
+
+  /* 一整列的「自動寬」區塊：gap 歸零，圖片才會緊貼成 AB 而不是 _A_ _B_ */
+  .exrow {
+    flex: 0 0 100%; min-width: 0;
+    display: flex; gap: 0; align-items: center;
+  }
+  .exrow.left   { justify-content: flex-start; }
+  .exrow.center { justify-content: center; }
+  .exrow.right  { justify-content: flex-end; }
+  .exrow .exblock { flex: 0 1 auto; min-width: 0; }
+  .exrow img { display: block; }
+  /* 貼在一起的邊要切平，兩張圖才會連成一條，而不是中間卡兩個圓角缺口 */
+  .exrow .exblock:not(:first-child) img { border-top-left-radius: 0;  border-bottom-left-radius: 0; }
+  .exrow .exblock:not(:last-child)  img { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 
   /* 字級與圖高都由 --fs / --ih 帶進來，再乘上整體縮放係數 ——
      這樣「排太滿就整頁縮小」不需要動到每一個 inline style */
@@ -247,7 +263,8 @@
     border-radius: 1vh;
     box-shadow: 0 0 0 .25vh rgba(255,200,31,.35), 0 1vh 3vh rgba(0,0,0,.55);
   }
-  .exblock.center img { margin: 0 auto; display: block; }
+  /* 用 inline-block ＋ 父層的 text-align 決定靠左／置中／靠右 */
+  .exblock img { display: inline-block; vertical-align: middle; }
   .exblock .imgfail { color: #ffa5b4; font-size: 2vh; font-weight: 700; }
 
   .explain { display: flex; gap: 2vw; align-items: stretch; min-height: 0; flex: 1 1 auto; }

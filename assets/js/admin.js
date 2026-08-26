@@ -7,7 +7,8 @@ import {
   signInWithGoogle, consumeRedirectResult, authErrorText, signOut, onAuthStateChanged,
   PATH, LETTERS, CATEGORIES, UNCATEGORIZED, LISTS, LIST_LABEL,
   categoryOf, listOf, questionsOf, parseBulkQuestions, ptsOf,
-  blocksOf, normalizeBlock, BLOCK_TYPES, BLOCK_SIZES, DEFAULT_BLOCK_SIZE,
+  blocksOf, groupBlocks, normalizeBlock, BLOCK_TYPES, BLOCK_SIZES, DEFAULT_BLOCK_SIZE,
+  BLOCK_WIDTHS, BLOCK_ALIGNS,
   TEXT_SIZE_VH, IMG_SIZE_VH,
   $, show, toast, toSortedList, escapeHtml, isHost, notHostHtml
 } from "./common.js";
@@ -71,16 +72,16 @@ function paintBlocks() {
       <div class="blkhead">
         <span class="kind">${BLOCK_LABEL[b.t]}</span>
         <select class="blk-w">
-          <option value="full" ${b.w === "full" ? "selected" : ""}>整行</option>
-          <option value="half" ${b.w === "half" ? "selected" : ""}>半行（可並排）</option>
+          ${BLOCK_WIDTHS.map(o => `<option value="${o.w}" ${
+            b.w === o.w ? "selected" : ""}>${o.name}</option>`).join("")}
         </select>
         <select class="blk-size">
           ${BLOCK_SIZES.map(s => `<option value="${s}" ${b.size === s ? "selected" : ""}>${
             b.t === "img" ? "圖 " : "字 "}${s}</option>`).join("")}
         </select>
         <select class="blk-align">
-          <option value="left"   ${b.align === "left"   ? "selected" : ""}>靠左</option>
-          <option value="center" ${b.align === "center" ? "selected" : ""}>置中</option>
+          ${BLOCK_ALIGNS.map(o => `<option value="${o.a}" ${
+            b.align === o.a ? "selected" : ""}>${o.name}</option>`).join("")}
         </select>
         <span style="flex:1 1 auto;"></span>
         <button class="btn ghost mini blk-up">↑</button>
@@ -133,9 +134,11 @@ function paintBlockPreview() {
     box.innerHTML = `<p class="empty">還沒有內容</p>`;
     return;
   }
-  // 預覽框比投影幕小，字級等比例縮小
+  // 預覽框比投影幕小，字級等比例縮小。
+  // 編輯區還沒顯示出來時量到的是 0，這時候先不要畫，等下一個影格再來。
+  if (!box.clientHeight) { requestAnimationFrame(paintBlockPreview); return; }
   const k = box.clientHeight / (window.innerHeight || 900);
-  box.innerHTML = `<div class="exblocks">${live.map(b => {
+  const one = b => {
     const cls = `exblock ${b.w} ${b.align}`;
     if (b.t === "img") {
       return `<div class="${cls}"><img src="${escapeHtml(b.v)}" alt=""
@@ -144,7 +147,11 @@ function paintBlockPreview() {
     const tag = b.t === "head" ? "h4" : "p";
     return `<${tag} class="${cls} ${b.t}" style="margin:0; font-size:${
       (TEXT_SIZE_VH[b.size] * k).toFixed(2)}vh">${escapeHtml(b.v)}</${tag}>`;
-  }).join("")}</div>`;
+  };
+  box.innerHTML = `<div class="exblocks">${groupBlocks(live.map(normalizeBlock)).map(r => r.auto
+    ? `<div class="exrow ${r.align}">${r.items.map(one).join("")}</div>`
+    : one(r.items[0])
+  ).join("")}</div>`;
 }
 
 // ---------- 登入 ----------
@@ -317,7 +324,6 @@ function openEditor(qid) {
   $("#ed-text").value   = q.text || "";
   // blocksOf 會把舊的 exText / exImg 自動轉成區塊，舊題目不用重編
   edBlocks = blocksOf(q);
-  paintBlocks();
   $("#ed-eximgfull").value = q.exImgFull || "";
   for (const L of LETTERS) $("#ed-" + L.toLowerCase()).value = q[L.toLowerCase()] || "";
   $("#ed-key").value = (qid === "new" ? "A" : keys[qid]) || "A";
@@ -325,6 +331,8 @@ function openEditor(qid) {
   paintPreview();
   show($("#ed-del"), qid !== "new");
   show($("#editor"), true);
+  // 一定要等編輯區顯示出來才畫預覽，否則量到的高度是 0，圖片會變成 max-height:0
+  paintBlocks();
   paintQuestions();
   $("#editor").scrollIntoView({ behavior: "smooth", block: "center" });
 }

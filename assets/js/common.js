@@ -170,6 +170,19 @@ export const BLOCK_TYPES = [
 ];
 
 export const BLOCK_SIZES = [1, 2, 3, 4, 5];
+
+/** 區塊寬度。auto = 只佔內容需要的寬，連續的 auto 會緊貼排成一列 */
+export const BLOCK_WIDTHS = [
+  { w: "full", name: "整行" },
+  { w: "half", name: "半行（可並排）" },
+  { w: "auto", name: "自動寬（緊貼並排）" }
+];
+
+export const BLOCK_ALIGNS = [
+  { a: "left",   name: "靠左" },
+  { a: "center", name: "置中" },
+  { a: "right",  name: "靠右" }
+];
 export const DEFAULT_BLOCK_SIZE = 3;
 
 /** 文字級距（vh）—— 投影頁還會再依實際高度縮放 */
@@ -185,10 +198,25 @@ export function normalizeBlock(b) {
   return {
     t,
     v: typeof b?.v === "string" ? b.v : "",
-    w: b?.w === "half" ? "half" : "full",
+    w: ["half", "auto"].includes(b?.w) ? b.w : "full",
     size,
-    align: b?.align === "center" ? "center" : "left"
+    align: ["center", "right"].includes(b?.align) ? b.align : "left"
   };
+}
+
+/**
+ * 把區塊分成一列一列。連續的「自動寬」區塊會收進同一列而且中間不留縫，
+ * 兩張圖片才會是緊貼的 AB，而不是各自置中的 _A_ _B_。
+ * 整列的對齊方式取這一列第一個區塊的 align（靠左／置中／靠右）。
+ */
+export function groupBlocks(blocks) {
+  const rows = [];
+  for (const b of blocks) {
+    const last = rows[rows.length - 1];
+    if (b.w === "auto" && last && last.auto) { last.items.push(b); continue; }
+    rows.push({ auto: b.w === "auto", align: b.align, items: [b] });
+  }
+  return rows;
 }
 
 /**

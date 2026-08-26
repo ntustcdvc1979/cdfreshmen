@@ -10,7 +10,7 @@ import {
   db, auth, ref, onValue, onAuthStateChanged,
   PATH, PHASE, LISTS, LETTERS, DEFAULT_LIMIT_SEC, CATEGORIES,
   categoryOf, questionsOf, tallyAllMembers, secondsLeft, isHost, ptsOf,
-  blocksOf, TEXT_SIZE_VH, IMG_SIZE_VH,
+  blocksOf, groupBlocks, TEXT_SIZE_VH, IMG_SIZE_VH,
   gridColumns, buildScoreboard, categoryMatrix, groupBestCategories, columnWinners,
   $, show, escapeHtml, toSortedList
 } from "./common.js";
@@ -748,7 +748,7 @@ function blocksHtml(q) {
   if (!blocks.length) {
     return `<p class="hint" style="font-size:2.4vh;"></p>`;
   }
-  return blocks.map(b => {
+  const one = b => {
     const cls = `exblock ${b.w} ${b.align}`;
     if (b.t === "img") {
       return `<div class="${cls}"><img src="${escapeHtml(b.v)}" alt=""
@@ -759,7 +759,12 @@ function blocksHtml(q) {
     const tag = b.t === "head" ? "h4" : "p";
     return `<${tag} class="${cls} ${b.t}"
       style="--fs:${TEXT_SIZE_VH[b.size]}vh">${escapeHtml(b.v)}</${tag}>`;
-  }).join("");
+  };
+  // 連續的「自動寬」區塊包成一列，中間不留縫
+  return groupBlocks(blocks).map(r => r.auto
+    ? `<div class="exrow ${r.align}">${r.items.map(one).join("")}</div>`
+    : one(r.items[0])
+  ).join("");
 }
 
 /** 排太滿就整體縮小，保證一頁塞得下 */

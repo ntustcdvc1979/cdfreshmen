@@ -7,7 +7,7 @@ import {
   buildScoreboard, categoryMatrix, categoryChampions, groupBestCategories, columnWinners,
   scoreOne, tallyMembers, tallyAllMembers, tallyReps, categoryOf, parseBulkQuestions,
   questionsOf, listOf, gridColumns, secondsLeft, ptsOf, LISTS,
-  blocksOf, normalizeBlock
+  blocksOf, normalizeBlock, groupBlocks
 } from "./assets/js/common.js";
 
 const log = [];
@@ -245,6 +245,37 @@ ok("只有舊文字 → 一個整行文字區塊",
    onlyText.length === 1 && onlyText[0].w === "full", JSON.stringify(onlyText));
 ok("有 blocks 時就不看舊欄位",
    blocksOf({ blocks: [{ t:"head", v:"新" }], exText: "舊", exImg: "i.png" }).length === 1);
+
+// ---- 8c. 靠右 ＋ 自動寬（緊貼並排） ----
+ok("靠右是合法的對齊", normalizeBlock({ align: "right" }).align === "right");
+ok("不合法的對齊退回靠左", normalizeBlock({ align: "top" }).align === "left");
+ok("自動寬是合法的寬度", normalizeBlock({ w: "auto" }).w === "auto");
+
+const N = a => a.map(normalizeBlock);
+let R = groupBlocks(N([{ t:"img", v:"a", w:"auto" }, { t:"img", v:"b", w:"auto" }]));
+ok("連續兩個自動寬收成同一列（AB 不留縫）",
+   R.length === 1 && R[0].auto && R[0].items.length === 2, JSON.stringify(R.map(r => r.items.length)));
+
+R = groupBlocks(N([{ t:"img", v:"a", w:"auto" }, { t:"text", v:"c", w:"full" },
+                   { t:"img", v:"b", w:"auto" }]));
+ok("中間夾了整行區塊就會斷開成三列",
+   R.length === 3 && R[0].auto && !R[1].auto && R[2].auto, JSON.stringify(R.map(r => r.auto)));
+
+R = groupBlocks(N([{ t:"img", v:"a", w:"auto", align:"right" },
+                   { t:"img", v:"b", w:"auto", align:"left" }]));
+ok("整列的對齊取第一個區塊的", R[0].align === "right", R[0].align);
+
+R = groupBlocks(N([{ t:"text", v:"a", w:"half" }, { t:"text", v:"b", w:"half" }]));
+ok("半行區塊各自成列（維持原本的 49% 並排）",
+   R.length === 2 && !R[0].auto && !R[1].auto);
+
+ok("沒有區塊時分列結果是空的", groupBlocks([]).length === 0);
+ok("分列不會漏掉或多出區塊", (() => {
+  const src = N([{t:"img",v:"1",w:"auto"},{t:"img",v:"2",w:"auto"},{t:"text",v:"3"},
+                 {t:"img",v:"4",w:"auto"},{t:"text",v:"5",w:"half"}]);
+  const flat = groupBlocks(src).flatMap(r => r.items);
+  return flat.length === src.length && flat.map(b => b.v).join("") === "12345";
+})());
 
 // ════════ 9. 類別工具 ════════
 ok("未知類別 → 未分類", categoryOf("nope").id === "uncat");
