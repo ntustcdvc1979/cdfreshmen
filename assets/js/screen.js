@@ -123,7 +123,11 @@ function closeWheel() {
 
 function onWheel() {
   const w = state.wheel;
-  if (!w || !w.id || w.id === lastWheelId) return;
+  if (!w || !w.id) {                    // 主持人按了「取消加倍」→ 轉盤收掉
+    if (lastWheelId !== null) { lastWheelId = null; closeWheel(); }
+    return;
+  }
+  if (w.id === lastWheelId) return;
   lastWheelId = w.id;
   spinWheel(w.gid);
 }

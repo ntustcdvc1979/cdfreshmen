@@ -58,6 +58,15 @@ jobs:
           rm -f _site/assets/js/firebase-config.example.js
           echo "已產生 _site/assets/js/firebase-config.js"
 
+          # 每次部署都給 js 檔加上版本號。GitHub Pages 的 Cache-Control 是 600 秒，
+          # 沒有版本號的話瀏覽器可能拿到「舊的 common.js + 新的 admin.js」，
+          # import 對不上就整頁掛掉（畫面全白、載不進後台）。
+          V="${GITHUB_SHA::8}"
+          find _site -name '*.html' -print0 | xargs -0 -r sed -i -E "s#(src=\"(\./)?assets/js/[A-Za-z0-9_-]+\.js)\"#\1?v=${V}\"#g; s#(from \"\./assets/js/[A-Za-z0-9_-]+\.js)\"#\1?v=${V}\"#g"
+          find _site/assets/js -name '*.js' -print0 | xargs -0 -r sed -i -E "s#(from \"\./[A-Za-z0-9_-]+\.js)\"#\1?v=${V}\"#g"
+          echo "已為 js 加上版本號 ?v=${V}"
+          grep -h -o 'assets/js/[A-Za-z0-9_-]*.js?v=[a-f0-9]*' _site/*.html | sort -u || true
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

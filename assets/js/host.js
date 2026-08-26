@@ -154,7 +154,9 @@ $("#btn-wheel").addEventListener("click", async () => {
 });
 
 $("#btn-wheel-clear").addEventListener("click", async () => {
-  await update(ref(db, PATH.state), { pendingDouble: null });
+  // 取消要取得乾淨：待生效的、已經蓋在本題上的、還有投影幕上的轉盤都要收掉
+  await update(ref(db, PATH.state), { pendingDouble: null, wheel: null });
+  if (curQid) await remove(ref(db, `${PATH.doubles}/${curQid}`));
   toast("已取消加倍");
 });
 
