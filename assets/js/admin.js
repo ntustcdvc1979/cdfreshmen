@@ -7,6 +7,8 @@ import {
   signInWithGoogle, consumeRedirectResult, authErrorText, signOut, onAuthStateChanged,
   PATH, LETTERS, CATEGORIES, UNCATEGORIZED, LISTS, LIST_LABEL,
   categoryOf, listOf, questionsOf, parseBulkQuestions, ptsOf,
+  blocksOf, normalizeBlock, BLOCK_TYPES, BLOCK_SIZES, DEFAULT_BLOCK_SIZE,
+  TEXT_SIZE_VH, IMG_SIZE_VH,
   $, show, toast, toSortedList, escapeHtml, isHost, notHostHtml
 } from "./common.js";
 
@@ -21,6 +23,7 @@ let groups = {}, questions = {}, keys = {}, intro = {};
 let editing = null;            // 正在編輯的題目 id；"new" 代表新增
 let booted = false;
 let curList = LISTS.MAIN;      // 正在編輯哪個題庫
+let edBlocks = [];             // 編輯中的說明排版區塊
 
 $("#sel-list").addEventListener("change", () => {
   curList = $("#sel-list").value === LISTS.DEMO ? LISTS.DEMO : LISTS.MAIN;
@@ -40,17 +43,108 @@ $("#btn-rulesimg").addEventListener("click", async () => {
   toast(url ? "已儲存規則圖" : "已改回內建示意圖");
 });
 
-// 圖片網址即時預覽
-$("#ed-eximg").addEventListener("input", paintPreview);
+// 整頁大圖的預覽
 $("#ed-eximgfull").addEventListener("input", paintPreview);
 function paintPreview() {
-  const url = $("#ed-eximg").value.trim();
-  show($("#ed-preview"), !!url);
-  if (url) $("#ed-preview-img").src = url;
-
   const full = $("#ed-eximgfull").value.trim();
   show($("#ed-preview-full"), !!full);
   if (full) $("#ed-preview-full-img").src = full;
+}
+
+// ============================================================
+//  說明頁的排版區塊
+// ============================================================
+const BLOCK_LABEL = Object.fromEntries(BLOCK_TYPES.map(b => [b.t, b.name]));
+
+$("#blk-add-head").addEventListener("click", () => addBlock("head"));
+$("#blk-add-text").addEventListener("click", () => addBlock("text"));
+$("#blk-add-img").addEventListener("click",  () => addBlock("img"));
+
+function addBlock(t) {
+  edBlocks.push(normalizeBlock({ t, v: "", w: "full", size: t === "head" ? 4 : DEFAULT_BLOCK_SIZE }));
+  paintBlocks();
+}
+
+function paintBlocks() {
+  $("#ed-blocks").innerHTML = edBlocks.map((b, i) => `
+    <div class="blk" data-i="${i}">
+      <div class="blkhead">
+        <span class="kind">${BLOCK_LABEL[b.t]}</span>
+        <select class="blk-w">
+          <option value="full" ${b.w === "full" ? "selected" : ""}>整行</option>
+          <option value="half" ${b.w === "half" ? "selected" : ""}>半行（可並排）</option>
+        </select>
+        <select class="blk-size">
+          ${BLOCK_SIZES.map(s => `<option value="${s}" ${b.size === s ? "selected" : ""}>${
+            b.t === "img" ? "圖 " : "字 "}${s}</option>`).join("")}
+        </select>
+        <select class="blk-align">
+          <option value="left"   ${b.align === "left"   ? "selected" : ""}>靠左</option>
+          <option value="center" ${b.align === "center" ? "selected" : ""}>置中</option>
+        </select>
+        <span style="flex:1 1 auto;"></span>
+        <button class="btn ghost mini blk-up">↑</button>
+        <button class="btn ghost mini blk-down">↓</button>
+        <button class="btn danger mini blk-del">刪除</button>
+      </div>
+      ${b.t === "img"
+        ? `<input class="blk-v" value="${escapeHtml(b.v)}" placeholder="https://… 或 assets/img/explain/檔名.png">`
+        : `<textarea class="blk-v" placeholder="${b.t === "head" ? "小標題文字" : "說明內容，可以換行"}">${escapeHtml(b.v)}</textarea>`}
+    </div>`).join("")
+    || `<p class="hint" style="text-align:left;">還沒有任何區塊。用下面的按鈕加一個。</p>`;
+
+  paintBlockPreview();
+}
+
+$("#ed-blocks").addEventListener("click", e => {
+  const box = e.target.closest("[data-i]");
+  if (!box) return;
+  const i = Number(box.dataset.i);
+  if (e.target.classList.contains("blk-del"))  { edBlocks.splice(i, 1); paintBlocks(); }
+  else if (e.target.classList.contains("blk-up")   && i > 0)
+    { [edBlocks[i - 1], edBlocks[i]] = [edBlocks[i], edBlocks[i - 1]]; paintBlocks(); }
+  else if (e.target.classList.contains("blk-down") && i < edBlocks.length - 1)
+    { [edBlocks[i + 1], edBlocks[i]] = [edBlocks[i], edBlocks[i + 1]]; paintBlocks(); }
+});
+
+$("#ed-blocks").addEventListener("input", e => {
+  const box = e.target.closest("[data-i]");
+  if (!box) return;
+  const b = edBlocks[Number(box.dataset.i)];
+  if (e.target.classList.contains("blk-v")) { b.v = e.target.value; paintBlockPreview(); }
+});
+
+$("#ed-blocks").addEventListener("change", e => {
+  const box = e.target.closest("[data-i]");
+  if (!box) return;
+  const b = edBlocks[Number(box.dataset.i)];
+  if (e.target.classList.contains("blk-w"))     b.w = e.target.value;
+  if (e.target.classList.contains("blk-size"))  b.size = Number(e.target.value);
+  if (e.target.classList.contains("blk-align")) b.align = e.target.value;
+  if (e.target.classList.contains("blk-v"))     { b.v = e.target.value; paintBlocks(); return; }
+  paintBlockPreview();
+});
+
+/** 用投影頁同一套 class 畫預覽，所見即所得 */
+function paintBlockPreview() {
+  const box = $("#ed-blkpreview");
+  const live = edBlocks.filter(b => (b.v || "").trim());
+  if (!live.length) {
+    box.innerHTML = `<p class="empty">還沒有內容 —— 投影幕上會顯示「這一題後台還沒有填說明」</p>`;
+    return;
+  }
+  // 預覽框比投影幕小，字級等比例縮小
+  const k = box.clientHeight / (window.innerHeight || 900);
+  box.innerHTML = `<div class="exblocks">${live.map(b => {
+    const cls = `exblock ${b.w} ${b.align}`;
+    if (b.t === "img") {
+      return `<div class="${cls}"><img src="${escapeHtml(b.v)}" alt=""
+        style="max-height:${(IMG_SIZE_VH[b.size] * k).toFixed(1)}vh"></div>`;
+    }
+    const tag = b.t === "head" ? "h4" : "p";
+    return `<${tag} class="${cls} ${b.t}" style="margin:0; font-size:${
+      (TEXT_SIZE_VH[b.size] * k).toFixed(2)}vh">${escapeHtml(b.v)}</${tag}>`;
+  }).join("")}</div>`;
 }
 
 // ---------- 登入 ----------
@@ -169,7 +263,9 @@ function paintQuestions() {
 
   $("#q-list").innerHTML = list.map((q, i) => {
     const cat = categoryOf(q.cat);
-    const hasEx = !!(q.exText || "").trim() || !!(q.exImg || "").trim() || !!(q.exImgFull || "").trim();
+    const blks  = blocksOf(q);
+    const hasEx = blks.length > 0 || !!(q.exImgFull || "").trim();
+    const nImg  = blks.filter(b => b.t === "img").length;
     return `
     <div class="qitem ${editing === q.id ? "editing" : ""}" data-qid="${escapeHtml(q.id)}">
       <div class="head">
@@ -181,7 +277,7 @@ function paintQuestions() {
         <span class="cat-pill" style="--cat:${cat.color}">${escapeHtml(cat.name)}</span>
         ${ptsOf(q) !== 1 ? `<span class="flag ok">配分 +${ptsOf(q)}</span>` : ""}
         <span class="flag ${hasEx ? "ok" : "warn"}">${hasEx ? "有說明" : "⚠ 沒有說明"}</span>
-        ${(q.exImg || "").trim()     ? `<span class="flag">含圖片</span>` : ""}
+        ${blks.length ? `<span class="flag">${blks.length} 個區塊${nImg ? `・${nImg} 圖` : ""}</span>` : ""}
         ${(q.exImgFull || "").trim() ? `<span class="flag">含整頁大圖</span>` : ""}
       </div>
       <div class="row" style="margin-top:10px;">
@@ -219,8 +315,9 @@ function openEditor(qid) {
   $("#ed-pts").value    = ptsOf(q);
   $("#ed-list").value   = qid === "new" ? curList : listOf(q);
   $("#ed-text").value   = q.text || "";
-  $("#ed-extext").value    = q.exText || "";
-  $("#ed-eximg").value     = q.exImg || "";
+  // blocksOf 會把舊的 exText / exImg 自動轉成區塊，舊題目不用重編
+  edBlocks = blocksOf(q);
+  paintBlocks();
   $("#ed-eximgfull").value = q.exImgFull || "";
   for (const L of LETTERS) $("#ed-" + L.toLowerCase()).value = q[L.toLowerCase()] || "";
   $("#ed-key").value = (qid === "new" ? "A" : keys[qid]) || "A";
@@ -252,11 +349,13 @@ $("#ed-save").addEventListener("click", async () => {
   if (!Number.isFinite(pts) || pts < 1 || pts > 99) { toast("配分要是 1～99 的整數"); return; }
   if (pts !== 1) data.pts = pts;
 
-  const exText   = $("#ed-extext").value.trim();
-  const exImg    = $("#ed-eximg").value.trim();
+  const blocks = edBlocks
+    .map(normalizeBlock)
+    .filter(b => b.v.trim())
+    .map(b => ({ ...b, v: b.v.trim() }));
+  if (blocks.length) data.blocks = blocks;
+
   const exImgFull = $("#ed-eximgfull").value.trim();
-  if (exText)    data.exText    = exText;
-  if (exImg)     data.exImg     = exImg;
   if (exImgFull) data.exImgFull = exImgFull;
 
   for (const L of LETTERS) {

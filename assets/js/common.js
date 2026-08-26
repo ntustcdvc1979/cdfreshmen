@@ -93,7 +93,10 @@ export function authErrorText(e) {
 //  /config/groups/{gid}           = { name, order }
 //  /config/intro                  = { rulesImg }                     ← 規則頁的圖（選填）
 //  /questions/{qid}               = { order, text, a,b,c,d, cat, list, pts,
-//                                     exText, exImg, exImgFull }      ← 公開可讀，不含正解
+//                                     blocks:[…], exImgFull }         ← 公開可讀，不含正解
+//     blocks = 說明頁的排版區塊，一格一個：
+//       { t:"text"|"img"|"head", v:內容, w:"full"|"half", size:1~5, align:"left"|"center" }
+//     半行的區塊會自動並排成兩欄。舊的 exText / exImg 仍然讀得到（會自動轉成區塊）。
 //  /answerKey/{qid}               = "A"                              ← 只有公布後才讀得到
 //  /state                         = { phase, list, qid, openedAt, limitSec,
 //                                     gridCols, showRepLetters, revealed:{qid:true} }
@@ -157,6 +160,62 @@ export const CATEGORIES = [
 ];
 
 export const UNCATEGORIZED = { id: "uncat", name: "未分類", color: "#7b8bb5" };
+
+// ---------- 說明頁排版區塊 ----------
+
+export const BLOCK_TYPES = [
+  { t: "head", name: "小標題" },
+  { t: "text", name: "文字" },
+  { t: "img",  name: "圖片" }
+];
+
+export const BLOCK_SIZES = [1, 2, 3, 4, 5];
+export const DEFAULT_BLOCK_SIZE = 3;
+
+/** 文字級距（vh）—— 投影頁還會再依實際高度縮放 */
+export const TEXT_SIZE_VH = { 1: 1.8, 2: 2.2, 3: 2.8, 4: 3.4, 5: 4.2 };
+/** 圖片高度上限（vh） */
+export const IMG_SIZE_VH  = { 1: 9,   2: 14,  3: 19,  4: 25,  5: 32  };
+
+/** 把一個區塊補齊預設值 */
+export function normalizeBlock(b) {
+  const t = ["text", "img", "head"].includes(b?.t) ? b.t : "text";
+  const size = BLOCK_SIZES.includes(Math.round(Number(b?.size)))
+    ? Math.round(Number(b.size)) : DEFAULT_BLOCK_SIZE;
+  return {
+    t,
+    v: typeof b?.v === "string" ? b.v : "",
+    w: b?.w === "half" ? "half" : "full",
+    size,
+    align: b?.align === "center" ? "center" : "left"
+  };
+}
+
+/**
+ * 取出一題的說明區塊。
+ * Firebase 可能把陣列存成物件，所以兩種都要接得住。
+ * 沒有 blocks 但有舊的 exText / exImg 時，自動轉成等效的區塊，
+ * 這樣舊題目不用重編也能照常顯示。
+ */
+export function blocksOf(q) {
+  const raw = q?.blocks;
+  let list = Array.isArray(raw) ? raw
+           : raw && typeof raw === "object"
+             ? Object.keys(raw).sort((a, b) => Number(a) - Number(b)).map(k => raw[k])
+             : null;
+
+  if (list && list.length) {
+    return list.map(normalizeBlock).filter(b => b.v.trim());
+  }
+
+  // 舊格式轉換
+  const out = [];
+  const txt = (q?.exText || "").trim();
+  const img = (q?.exImg || "").trim();
+  if (txt) out.push(normalizeBlock({ t: "text", v: txt, w: img ? "half" : "full", size: 3 }));
+  if (img) out.push(normalizeBlock({ t: "img",  v: img, w: txt ? "half" : "full", size: 4 }));
+  return out;
+}
 
 /** 由 id 取回類別（找不到就回傳「未分類」） */
 export function categoryOf(id) {

@@ -6,7 +6,8 @@ b{color:#ffd24a}.f{color:#ff8497}</style></head>
 import {
   buildScoreboard, categoryMatrix, categoryChampions, groupBestCategories, columnWinners,
   scoreOne, tallyMembers, tallyAllMembers, tallyReps, categoryOf, parseBulkQuestions,
-  questionsOf, listOf, gridColumns, secondsLeft, ptsOf, LISTS
+  questionsOf, listOf, gridColumns, secondsLeft, ptsOf, LISTS,
+  blocksOf, normalizeBlock
 } from "./assets/js/common.js";
 
 const log = [];
@@ -212,6 +213,38 @@ throws("欄位不夠", "題幹|甲|A", "欄位不夠");
 throws("類別打錯字", "題幹|甲|乙|A|情緒大師", "看不懂最後一欄");
 throws("正解指向空選項", "題幹|甲|乙||D", "沒有填");
 throws("全空", "   \n  ", "沒有讀到");
+
+// ════════ 8b. 說明排版區塊 ════════
+let nb = normalizeBlock({});
+ok("空區塊會補上預設值", nb.t === "text" && nb.w === "full" && nb.size === 3 && nb.align === "left",
+   JSON.stringify(nb));
+nb = normalizeBlock({ t: "img", v: "u", w: "half", size: 5, align: "center" });
+ok("完整區塊原樣保留", nb.t === "img" && nb.w === "half" && nb.size === 5 && nb.align === "center");
+ok("不合法的型別退回文字", normalizeBlock({ t: "video" }).t === "text");
+ok("不合法的寬度退回整行", normalizeBlock({ w: "third" }).w === "full");
+ok("超出範圍的大小退回 3",
+   normalizeBlock({ size: 9 }).size === 3 && normalizeBlock({ size: 0 }).size === 3
+   && normalizeBlock({ size: "x" }).size === 3);
+
+const B = [{ t:"head", v:"標題" }, { t:"text", v:"內文" }, { t:"img", v:"u.png" }];
+ok("陣列型 blocks 讀得到", blocksOf({ blocks: B }).length === 3);
+ok("Firebase 物件型 blocks 也讀得到（且順序正確）",
+   blocksOf({ blocks: { "0":B[0], "1":B[1], "2":B[2] } }).map(b => b.t).join(",") === "head,text,img");
+ok("鍵值亂序時依數字排",
+   blocksOf({ blocks: { "2":B[2], "0":B[0], "1":B[1] } }).map(b => b.t).join(",") === "head,text,img");
+ok("空內容的區塊會被濾掉",
+   blocksOf({ blocks: [{ t:"text", v:"" }, { t:"text", v:"  " }, { t:"text", v:"有" }] }).length === 1);
+
+ok("沒有 blocks 也沒有舊欄位 → 空陣列", blocksOf({}).length === 0);
+const legacy = blocksOf({ exText: "說明", exImg: "i.png" });
+ok("舊的 exText+exImg 自動轉成兩個半行區塊",
+   legacy.length === 2 && legacy[0].t === "text" && legacy[0].w === "half"
+   && legacy[1].t === "img" && legacy[1].w === "half", JSON.stringify(legacy.map(b => b.t + ":" + b.w)));
+const onlyText = blocksOf({ exText: "只有文字" });
+ok("只有舊文字 → 一個整行文字區塊",
+   onlyText.length === 1 && onlyText[0].w === "full", JSON.stringify(onlyText));
+ok("有 blocks 時就不看舊欄位",
+   blocksOf({ blocks: [{ t:"head", v:"新" }], exText: "舊", exImg: "i.png" }).length === 1);
 
 // ════════ 9. 類別工具 ════════
 ok("未知類別 → 未分類", categoryOf("nope").id === "uncat");

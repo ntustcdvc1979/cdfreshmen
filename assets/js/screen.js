@@ -10,6 +10,7 @@ import {
   db, auth, ref, onValue, onAuthStateChanged,
   PATH, PHASE, LISTS, LETTERS, DEFAULT_LIMIT_SEC, CATEGORIES,
   categoryOf, questionsOf, tallyAllMembers, secondsLeft, isHost, ptsOf,
+  blocksOf, TEXT_SIZE_VH, IMG_SIZE_VH,
   gridColumns, buildScoreboard, categoryMatrix, groupBestCategories, columnWinners,
   $, show, escapeHtml, toSortedList
 } from "./common.js";
@@ -715,9 +716,7 @@ function paintRevealPage(qid, q) {
 function paintReveal(qid, q) {
   foot.textContent = "已公布答案";
 
-  const key    = keys[qid];
-  const hasImg = !!(q.exImg || "").trim();
-  const text   = (q.exText || "").trim();
+  const key = keys[qid];
 
   body.innerHTML = `
     <div class="reveal-top">
@@ -727,18 +726,48 @@ function paintReveal(qid, q) {
       </div>
       <div class="reveal-ex">
         <h3 class="title-gold" style="font-size:3vh; margin:0 0 1vh;">💡 說明</h3>
-        <div class="explain ${hasImg ? "" : "noimg"}">
-          <div class="txt" id="s-extext">${text ? escapeHtml(text) : "（這一題後台還沒有填說明）"}</div>
-          <div class="pic">${hasImg ? `<img src="${escapeHtml(q.exImg)}" alt="說明圖片"
-            onerror="this.closest('.explain').classList.add('noimg')">` : ""}</div>
-        </div>
+        <div class="exblocks" id="s-exblocks">${blocksHtml(q)}</div>
       </div>
     </div>
     <div class="grid" id="s-grid" style="flex:0 0 26vh;"></div>`;
 
-  const t = $("#s-extext");
-  fitToBox(t, t, "font-size", 3, 1.4);
+  fitBlocks($("#s-exblocks"));
   paintGrid(qid, true);
+}
+
+/**
+ * 把後台排好的說明區塊畫出來。
+ * 半行的區塊會自動並排成兩欄；沒有區塊就顯示提示，不要開天窗。
+ */
+function blocksHtml(q) {
+  const blocks = blocksOf(q);
+  if (!blocks.length) {
+    return `<p class="hint" style="font-size:2.4vh;">（這一題後台還沒有填說明）</p>`;
+  }
+  return blocks.map(b => {
+    const cls = `exblock ${b.w} ${b.align}`;
+    if (b.t === "img") {
+      return `<div class="${cls}"><img src="${escapeHtml(b.v)}" alt=""
+        style="--ih:${IMG_SIZE_VH[b.size]}vh"
+        onerror="this.replaceWith(Object.assign(document.createElement('span'),
+          {className:'imgfail', textContent:'圖片載不出來'}))"></div>`;
+    }
+    const tag = b.t === "head" ? "h4" : "p";
+    return `<${tag} class="${cls} ${b.t}"
+      style="--fs:${TEXT_SIZE_VH[b.size]}vh">${escapeHtml(b.v)}</${tag}>`;
+  }).join("");
+}
+
+/** 排太滿就整體縮小，保證一頁塞得下 */
+function fitBlocks(el) {
+  if (!el) return;
+  let k = 1;
+  el.style.setProperty("--blk-scale", k);
+  for (let i = 0; i < 24 && k > 0.45; i++) {
+    if (el.scrollHeight <= el.clientHeight + 1) break;
+    k -= 0.04;
+    el.style.setProperty("--blk-scale", k.toFixed(2));
+  }
 }
 
 function paintFullImage(qid, q) {

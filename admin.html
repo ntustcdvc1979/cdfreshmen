@@ -24,6 +24,36 @@
                  background:rgba(53,168,255,.16); border:1px solid rgba(53,168,255,.45); color:var(--cyan-lt); }
   .qitem .flag.warn { background:rgba(255,84,112,.14); border-color:var(--bad); color:#ffa5b4; }
   .qitem .flag.ok   { background:rgba(47,217,107,.14); border-color:var(--ok); color:#7bffab; }
+
+  /* 說明區塊編輯器 */
+  .blk { border:2px solid rgba(53,168,255,.35); border-radius:10px; padding:10px;
+         background:rgba(4,12,64,.55); }
+  .blk .blkhead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  .blk .blkhead .kind { font-weight:900; color:var(--gold); font-size:14px; min-width:52px; }
+  .blk select, .blk input, .blk textarea { padding:8px 10px; font-size:14px; }
+  .blk select { width:auto; }
+  .blk textarea { min-height:72px; }
+
+  /* 投影幕排版預覽：16:9 縮圖 */
+  .ex-preview {
+    position:relative; width:100%; aspect-ratio:16/9;
+    border:2px solid rgba(53,168,255,.4); border-radius:12px; overflow:hidden;
+    background:linear-gradient(180deg,#00043f,#050e5e);
+    padding:14px;
+  }
+  .ex-preview .exblocks { --blk-scale:1; height:100%; overflow:hidden;
+    display:flex; flex-wrap:wrap; align-content:flex-start; gap:10px 2%; }
+  .ex-preview .exblock { margin:0; min-width:0; }
+  .ex-preview .exblock.full { flex:0 0 100%; }
+  .ex-preview .exblock.half { flex:0 0 49%; }
+  .ex-preview .exblock.center { text-align:center; }
+  .ex-preview .exblock.left { text-align:left; }
+  .ex-preview .exblock.text { color:#e6eeff; line-height:1.5; white-space:pre-wrap; }
+  .ex-preview .exblock.head { color:var(--gold-lt); font-weight:900; line-height:1.3; }
+  .ex-preview .exblock img { max-width:100%; object-fit:contain; border-radius:6px;
+    box-shadow:0 0 0 2px rgba(255,200,31,.3); }
+  .ex-preview .exblock.center img { margin:0 auto; display:block; }
+  .ex-preview .empty { color:var(--txt-dim); font-size:13px; text-align:center; padding-top:20%; }
 </style>
 </head>
 <body>
@@ -137,19 +167,20 @@
 
       <hr style="border:none; border-top:1px solid rgba(53,168,255,.3); margin:4px 0;">
       <p class="hint" style="text-align:left; margin:0;">
-        <b style="color:var(--gold-lt)">公布答案後的說明</b>　會跟正解<b>同時</b>出現在投影幕上，不用再按鍵。
+        <b style="color:var(--gold-lt)">公布答案後的說明</b>　會跟正解<b>同時</b>出現在投影幕上。
+        下面一格一格排，<b>半行</b>的區塊會自動並排成兩欄。
       </p>
-      <div class="field">
-        <label for="ed-extext">說明文字</label>
-        <textarea id="ed-extext" style="min-height:110px;" placeholder="為什麼是這個答案、想讓新生帶走什麼觀念…（可留空）"></textarea>
+
+      <div id="ed-blocks" class="stack" style="gap:10px;"></div>
+
+      <div class="row">
+        <button id="blk-add-head" class="btn ghost mini">＋ 小標題</button>
+        <button id="blk-add-text" class="btn ghost mini">＋ 文字</button>
+        <button id="blk-add-img"  class="btn ghost mini">＋ 圖片</button>
       </div>
-      <div class="field">
-        <label for="ed-eximg">說明圖片網址（跟文字併排，選填）</label>
-        <input id="ed-eximg" placeholder="https://… 或 assets/img/explain/q1.png">
-      </div>
-      <div id="ed-preview" class="center hidden" style="margin:4px 0;">
-        <img id="ed-preview-img" alt="預覽" style="max-width:100%; max-height:200px; border-radius:10px; box-shadow:0 0 0 2px rgba(255,200,31,.35);">
-      </div>
+
+      <p class="hint" style="text-align:left; margin:0;">下面是投影幕上的實際排版預覽：</p>
+      <div class="ex-preview" id="ed-blkpreview"></div>
 
       <div class="field">
         <label for="ed-eximgfull">整頁大圖網址（自己獨立一頁，選填）</label>
