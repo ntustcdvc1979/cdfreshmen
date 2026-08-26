@@ -231,19 +231,17 @@
   .exblock.right  { text-align: right; }
   .exblock.auto   { flex: 0 1 auto; }
 
-  /* 一整列的「自動寬」區塊：gap 歸零，圖片才會緊貼成 AB 而不是 _A_ _B_ */
+  /* 一整列的「自動寬」區塊：只留一點點縫，是 A B 而不是撐開的 _A_ _B_。
+     縫隙跟著整頁縮放係數一起縮，排太滿時才不會反而變明顯 */
   .exrow {
     flex: 0 0 100%; min-width: 0;
-    display: flex; gap: 0; align-items: center;
+    display: flex; gap: calc(1vh * var(--blk-scale, 1)); align-items: center;
   }
   .exrow.left   { justify-content: flex-start; }
   .exrow.center { justify-content: center; }
   .exrow.right  { justify-content: flex-end; }
   .exrow .exblock { flex: 0 1 auto; min-width: 0; }
   .exrow img { display: block; }
-  /* 貼在一起的邊要切平，兩張圖才會連成一條，而不是中間卡兩個圓角缺口 */
-  .exrow .exblock:not(:first-child) img { border-top-left-radius: 0;  border-bottom-left-radius: 0; }
-  .exrow .exblock:not(:last-child)  img { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 
   /* 字級與圖高都由 --fs / --ih 帶進來，再乘上整體縮放係數 ——
      這樣「排太滿就整頁縮小」不需要動到每一個 inline style */

@@ -760,7 +760,7 @@ function blocksHtml(q) {
     return `<${tag} class="${cls} ${b.t}"
       style="--fs:${TEXT_SIZE_VH[b.size]}vh">${escapeHtml(b.v)}</${tag}>`;
   };
-  // 連續的「自動寬」區塊包成一列，中間不留縫
+  // 連續的「自動寬」區塊包成一列，中間只留一點點縫
   return groupBlocks(blocks).map(r => r.auto
     ? `<div class="exrow ${r.align}">${r.items.map(one).join("")}</div>`
     : one(r.items[0])
