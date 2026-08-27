@@ -105,7 +105,7 @@ function onStateChange() {
 
   if (phase === PHASE.OPEN) {
     snd.stopBgm();
-    snd.startBgm(state.limitSec || DEFAULT_LIMIT_SEC);
+    snd.startBgm();
     startTicker();
   } else {
     snd.stopBgm();

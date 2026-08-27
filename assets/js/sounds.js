@@ -1,5 +1,5 @@
 // ============================================================
-//  音效 —— 全部用 Web Audio 即時合成，不需要任何音檔
+//  音效 —— 提示音用 Web Audio 即時合成，作答背景音樂則是 assets/audio 下的音檔
 //  ------------------------------------------------------------
 //  瀏覽器規定必須先有使用者手勢才能出聲，所以投影頁上有一顆
 //  「開啟音效」按鈕，按下時呼叫 unlock()。
@@ -21,6 +21,8 @@ export async function unlock() {
   }
   if (ctx.state === "suspended") await ctx.resume();
   enabled = ctx.state === "running";
+  // 先把 BGM 接起來開始緩衝，第一題才不會卡在下載
+  if (enabled) ensureBgm();
   return enabled;
 }
 
@@ -90,192 +92,69 @@ export function tick(left) {
 }
 
 // ============================================================
-//  倒數 BGM
+//  作答背景音樂
 //  ------------------------------------------------------------
-//  A 小調的四小節循環（Am → Am → F → E），16 分音符的低音固定音型
-//  加上大鼓與 hi-hat。速度從 104 BPM 一路推到 168 BPM，
-//  低通濾波與音量同時往上開，越接近時間到越緊繃。
-//  用「預先排程」的方式送出音符，所以不會被主執行緒卡頓影響節奏。
+//  播 assets/audio/bgm-quiz.mp3，接到 master 上，setVolume() 一樣管得到。
+//  開放作答時淡入，截止時淡出 —— 直接 pause 會「喀」一聲。
+//  路徑用 import.meta.url 解析，之後換別頁引用這個模組也不會斷。
 // ============================================================
 
-const A1 = 55;                                   // 基準音 A1
-const semi = n => A1 * Math.pow(2, n / 12);
+const BGM_URL  = new URL("../audio/bgm-quiz.mp3", import.meta.url).href;
+const BGM_GAIN = 0.5;      // 壓在主持人講話之下
+const FADE_IN  = 0.8;
+const FADE_OUT = 0.5;
 
-// 四小節的和弦根音（半音位移）：Am, Am, F, E
-const CHORD_ROOTS = [0, 0, 8, 7];
-// 一小節 16 個 16 分音符，低音的音型（null = 休止）
-const BASS_PATTERN = [0, null, 0, null, 0, null, 12, null, 0, null, 0, null, 7, null, 12, null];
-const KICK_STEPS = [0, 6, 10];
-const BARS = 4;
+const bgm = { on: false, el: null, src: null, gain: null };
 
-const bgm = {
-  on: false, step: 0, nextAt: 0, timer: null,
-  startedAt: 0, limit: 60, pad: null, padGain: null, padFilter: null, bus: null
-};
-
-function bgmTempo() {
-  const p = Math.min(1, Math.max(0, (ctx.currentTime - bgm.startedAt) / bgm.limit));
-  return 104 + p * 64;                           // 104 → 168 BPM
-}
-
-/** 一個 16 分音符 */
-function stepDur() { return 60 / bgmTempo() / 4; }
-
-function bassNote(freq, at, dur, gain) {
-  const osc = ctx.createOscillator();
-  const sub = ctx.createOscillator();
-  const lp  = ctx.createBiquadFilter();
-  const g   = ctx.createGain();
-
-  osc.type = "sawtooth"; osc.frequency.setValueAtTime(freq, at);
-  sub.type = "sine";     sub.frequency.setValueAtTime(freq / 2, at);
-
-  lp.type = "lowpass";
-  lp.frequency.setValueAtTime(420, at);
-  lp.frequency.exponentialRampToValueAtTime(180, at + dur);
-  lp.Q.value = 6;
-
-  g.gain.setValueAtTime(0.0001, at);
-  g.gain.exponentialRampToValueAtTime(gain, at + 0.008);
-  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-
-  osc.connect(lp); sub.connect(lp);
-  lp.connect(g).connect(bgm.bus);
-  osc.start(at); sub.start(at);
-  osc.stop(at + dur + 0.02); sub.stop(at + dur + 0.02);
-}
-
-function kick(at, gain) {
-  const osc = ctx.createOscillator();
-  const g   = ctx.createGain();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(135, at);
-  osc.frequency.exponentialRampToValueAtTime(46, at + 0.11);
-  g.gain.setValueAtTime(gain, at);
-  g.gain.exponentialRampToValueAtTime(0.0001, at + 0.14);
-  osc.connect(g).connect(bgm.bus);
-  osc.start(at); osc.stop(at + 0.16);
-}
-
-function hat(at, gain) {
-  const len = Math.floor(ctx.sampleRate * 0.03);
-  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-  const src = ctx.createBufferSource(); src.buffer = buf;
-  const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 7000;
-  const g = ctx.createGain(); g.gain.value = gain;
-  src.connect(hp).connect(g).connect(bgm.bus);
-  src.start(at);
-}
-
-/** 四小節結尾的上升噪音，把張力接到下一輪 */
-function riser(at, dur) {
-  const len = Math.floor(ctx.sampleRate * dur);
-  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-  const src = ctx.createBufferSource(); src.buffer = buf;
-  const bp = ctx.createBiquadFilter();
-  bp.type = "bandpass"; bp.Q.value = 3;
-  bp.frequency.setValueAtTime(500, at);
-  bp.frequency.exponentialRampToValueAtTime(5200, at + dur);
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(0.0001, at);
-  g.gain.exponentialRampToValueAtTime(0.055, at + dur * 0.85);
-  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-  src.connect(bp).connect(g).connect(bgm.bus);
-  src.start(at); src.stop(at + dur);
-}
-
-function scheduleStep(step, at) {
-  const bar  = Math.floor(step / 16) % BARS;
-  const i    = step % 16;
-  const root = CHORD_ROOTS[bar];
-  const urgency = Math.min(1, Math.max(0, (ctx.currentTime - bgm.startedAt) / bgm.limit));
-
-  const off = BASS_PATTERN[i];
-  if (off !== null) {
-    const accent = i === 0 ? 1 : 0.72;
-    bassNote(semi(root + off), at, stepDur() * 1.7, (0.10 + urgency * 0.06) * accent);
+/**
+ * <audio> 與 MediaElementSource 都只建一次 ——
+ * 同一個 <audio> 不能接第二次 createMediaElementSource，會直接丟例外。
+ */
+function ensureBgm() {
+  if (!bgm.el) {
+    bgm.el = new Audio(BGM_URL);
+    bgm.el.loop = true;    // 題目時間比曲子長就接著繞回去
+    bgm.el.preload = "auto";
   }
-  if (KICK_STEPS.includes(i)) kick(at, 0.22 + urgency * 0.1);
-  if (i % 2 === 1) hat(at, (i % 4 === 3 ? 0.05 : 0.028) + urgency * 0.02);
-
-  // 每四小節的最後一小節放一段上升噪音
-  if (bar === BARS - 1 && i === 8) riser(at, stepDur() * 8);
-
-  // 和弦換了就把 pad 移到新的根音
-  if (i === 0 && bgm.pad) {
-    bgm.pad.forEach((osc, k) => {
-      osc.frequency.setTargetAtTime(semi(root + [12, 15, 19, 24][k]), at, 0.05);
-    });
+  if (!bgm.src && ctx) {
+    bgm.src  = ctx.createMediaElementSource(bgm.el);
+    bgm.gain = ctx.createGain();
+    bgm.gain.gain.value = 0.0001;
+    bgm.src.connect(bgm.gain).connect(master);
   }
+  return bgm.el;
 }
 
-function bgmTick() {
-  if (!bgm.on) return;
-  while (bgm.nextAt < ctx.currentTime + 0.15) {
-    scheduleStep(bgm.step, Math.max(bgm.nextAt, ctx.currentTime + 0.01));
-    bgm.nextAt += stepDur();
-    bgm.step = (bgm.step + 1) % (16 * BARS);
-  }
-}
-
-/** 開放作答時啟動倒數 BGM */
-export function startBgm(limitSec = 60) {
+/** 開放作答 → 從頭淡入 */
+export function startBgm() {
   if (!enabled || bgm.on) return;
-  const t = ctx.currentTime;
-
-  bgm.bus = ctx.createGain();
-  bgm.bus.gain.setValueAtTime(0.0001, t);
-  bgm.bus.gain.exponentialRampToValueAtTime(0.9, t + 0.8);
-  bgm.bus.connect(master);
-
-  // 持續的和弦鋪底
-  bgm.padFilter = ctx.createBiquadFilter();
-  bgm.padFilter.type = "lowpass";
-  bgm.padFilter.frequency.setValueAtTime(600, t);
-  bgm.padFilter.frequency.linearRampToValueAtTime(2400, t + limitSec);
-  bgm.padGain = ctx.createGain();
-  bgm.padGain.gain.setValueAtTime(0.0001, t);
-  bgm.padGain.gain.exponentialRampToValueAtTime(0.035, t + 1.5);
-  bgm.padGain.gain.linearRampToValueAtTime(0.062, t + limitSec);
-  bgm.padFilter.connect(bgm.padGain).connect(bgm.bus);
-
-  bgm.pad = [12, 15, 19, 24].map(n => {          // A minor add9 的堆疊
-    const osc = ctx.createOscillator();
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(semi(n), t);
-    osc.detune.value = (Math.random() - 0.5) * 12;
-    osc.connect(bgm.padFilter);
-    osc.start(t);
-    return osc;
-  });
+  const el = ensureBgm();
+  if (!bgm.gain) return;
 
   bgm.on = true;
-  bgm.step = 0;
-  bgm.startedAt = t;
-  bgm.limit = Math.max(5, limitSec);
-  bgm.nextAt = t + 0.06;
-  bgmTick();
-  bgm.timer = setInterval(bgmTick, 25);
+  try { el.currentTime = 0; } catch { /* 還沒 seek 得動就算了，照樣播 */ }
+
+  const t = ctx.currentTime;
+  bgm.gain.gain.cancelScheduledValues(t);
+  bgm.gain.gain.setValueAtTime(0.0001, t);
+  bgm.gain.gain.exponentialRampToValueAtTime(BGM_GAIN, t + FADE_IN);
+  el.play().catch(() => {});   // 沒解鎖就播不出來，不用吵
 }
 
+/** 截止或換階段 → 淡出後才真的停 */
 export function stopBgm() {
   if (!bgm.on) return;
   bgm.on = false;
-  clearInterval(bgm.timer);
-  bgm.timer = null;
+  const el = bgm.el;
+  if (!el) return;
+  if (!enabled || !bgm.gain) { el.pause(); return; }
 
-  if (!enabled) { bgm.pad = null; bgm.bus = null; return; }
   const t = ctx.currentTime;
-  bgm.bus.gain.cancelScheduledValues(t);
-  bgm.bus.gain.setValueAtTime(bgm.bus.gain.value, t);
-  bgm.bus.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-  (bgm.pad || []).forEach(osc => osc.stop(t + 0.45));
-  bgm.pad = null;
-  bgm.bus = null;
+  bgm.gain.gain.cancelScheduledValues(t);
+  bgm.gain.gain.setValueAtTime(Math.max(bgm.gain.gain.value, 0.0001), t);
+  bgm.gain.gain.exponentialRampToValueAtTime(0.0001, t + FADE_OUT);
+  // 淡出跑完才 pause；期間又開了新的一題就不要停
+  setTimeout(() => { if (!bgm.on) el.pause(); }, FADE_OUT * 1000 + 60);
 }
 
 /** 某一組代表按下確認 —— 明亮的兩音上揚 */
