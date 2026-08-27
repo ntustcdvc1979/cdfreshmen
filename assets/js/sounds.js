@@ -22,7 +22,7 @@ export async function unlock() {
   if (ctx.state === "suspended") await ctx.resume();
   enabled = ctx.state === "running";
   // 先把音樂接起來開始緩衝、撞擊聲先解碼好，正式要用時才不會卡住
-  if (enabled) { quizBgm.prime(); revealBgm.prime(); loadRevealSfx(); }
+  if (enabled) { quizBgm.prime(); revealBgm.prime(); finalBgm.prime(); loadRevealSfx(); }
   return enabled;
 }
 
@@ -162,6 +162,7 @@ function makeTrack(file, { volume = 0.5, fadeIn = 0.8, fadeOut = 0.5 } = {}) {
 
 const quizBgm   = makeTrack("bgm-quiz.mp3",   { volume: 0.5, fadeIn: 0.8, fadeOut: 0.5 });
 const revealBgm = makeTrack("bgm-reveal.mp3", { volume: 0.4, fadeIn: 1.2, fadeOut: 0.8 });
+const finalBgm  = makeTrack("bgm-final.mp3",  { volume: 0.45, fadeIn: 1.0, fadeOut: 0.8 });
 
 /** 開放作答 → 緊張的循環 */
 export function startBgm() { quizBgm.start(); }
@@ -170,6 +171,10 @@ export function stopBgm()  { quizBgm.stop();  }
 /** 公布答案後的講解 → 鋼琴弦樂鋪底，壓低一點讓主持人講得下去 */
 export function startRevealBgm() { revealBgm.start(); }
 export function stopRevealBgm()  { revealBgm.stop();  }
+
+/** 排行榜 → funk 墊在揭曉名次底下 */
+export function startFinalBgm() { finalBgm.start(); }
+export function stopFinalBgm()  { finalBgm.stop();  }
 
 // ---------- 一次性音效（整段解碼，觸發時零延遲） ----------
 

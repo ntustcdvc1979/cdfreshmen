@@ -103,8 +103,9 @@ function onStateChange() {
   // 出題就把轉盤收掉 —— 在那之前它會一直留在畫面上
   if (phase === PHASE.OPEN || qid !== lastQid) closeWheel();
 
-  // 一離開公布階段就把講解音樂收掉
+  // 一離開該階段就把對應的背景音樂收掉
   if (phase !== PHASE.REVEAL) snd.stopRevealBgm();
+  if (phase !== PHASE.FINAL)  snd.stopFinalBgm();
 
   if (phase === PHASE.OPEN) {
     snd.stopBgm();
@@ -117,7 +118,10 @@ function onStateChange() {
     if (phase === PHASE.LOCKED && lastPhase === PHASE.OPEN) snd.timeUp();
     // 撞擊聲下去，接著鋼琴弦樂鋪在講解底下
     if (phase === PHASE.REVEAL) { snd.fanfare(); snd.startRevealBgm(); }
-    if (phase === PHASE.FINAL && lastPhase !== PHASE.FINAL) podiumStep = 0;
+    if (phase === PHASE.FINAL) {
+      if (lastPhase !== PHASE.FINAL) podiumStep = 0;
+      snd.startFinalBgm();          // 排行榜的 funk 墊底
+    }
   }
 
   if (qid !== lastQid) {
@@ -343,6 +347,8 @@ function fitToBox(el, box, prop, startVh, minVh = 0.8) {
 const activeList = () => state.list === LISTS.DEMO ? LISTS.DEMO : LISTS.MAIN;
 const qList  = () => questionsOf(questions, activeList());
 const qIndex = qid => qList().findIndex(q => q.id === qid);
+/** 題幹外框：單數題黃、偶數題綠 */
+const qParity = qid => (qIndex(qid) + 1) % 2 === 1 ? "odd" : "even";
 
 /** 這一題公布後要不要插一頁戰況：每 5 題一次，最後一題不插 */
 function showsStandings(qid) {
@@ -663,7 +669,7 @@ function paintPlay(qid, q, phase) {
   body.innerHTML = `
     <div class="qblock" id="s-qblock">
       <div style="flex:1 1 auto; min-width:0;">
-        <div class="big-q" id="s-bigq">${escapeHtml(q.text || "")}</div>
+        <div class="big-q ${qParity(qid)}" id="s-bigq">${escapeHtml(q.text || "")}</div>
         <div class="opt-row">
           ${LETTERS.filter(L => q[L.toLowerCase()]).map(L =>
             `<div class="opt-mini"><span class="k">${L}</span><span class="t">${escapeHtml(q[L.toLowerCase()])}</span></div>`
@@ -866,7 +872,7 @@ function paintDistribution(qid, q) {
   const t   = tallyAllMembers(allResp[qid]);
 
   body.innerHTML = `
-    <div class="big-q" style="font-size:3.2vh; padding:1.8vh 2vw; flex:0 0 auto;">${escapeHtml(q.text || "")}</div>
+    <div class="big-q ${qParity(qid)}" style="font-size:3.2vh; padding:1.8vh 2vw; flex:0 0 auto;">${escapeHtml(q.text || "")}</div>
     <div class="bars screen-bars" style="flex:0 0 auto; margin-top:1.6vh;">
       ${LETTERS.filter(L => q[L.toLowerCase()]).map(L => {
         const n = t[L], pct = t.total ? Math.round(n / t.total * 100) : 0;
