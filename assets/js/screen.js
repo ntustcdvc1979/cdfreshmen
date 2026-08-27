@@ -103,6 +103,9 @@ function onStateChange() {
   // 出題就把轉盤收掉 —— 在那之前它會一直留在畫面上
   if (phase === PHASE.OPEN || qid !== lastQid) closeWheel();
 
+  // 一離開公布階段就把講解音樂收掉
+  if (phase !== PHASE.REVEAL) snd.stopRevealBgm();
+
   if (phase === PHASE.OPEN) {
     snd.stopBgm();
     snd.startBgm();
@@ -112,7 +115,8 @@ function onStateChange() {
     stopTicker();
     stage.classList.remove("tense", "shake");
     if (phase === PHASE.LOCKED && lastPhase === PHASE.OPEN) snd.timeUp();
-    if (phase === PHASE.REVEAL) snd.fanfare();
+    // 撞擊聲下去，接著鋼琴弦樂鋪在講解底下
+    if (phase === PHASE.REVEAL) { snd.fanfare(); snd.startRevealBgm(); }
     if (phase === PHASE.FINAL && lastPhase !== PHASE.FINAL) podiumStep = 0;
   }
 

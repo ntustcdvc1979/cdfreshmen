@@ -144,7 +144,7 @@ export const ROLE = {
 
 export const LETTERS = ["A", "B", "C", "D"];
 
-export const DEFAULT_LIMIT_SEC = 60;
+export const DEFAULT_LIMIT_SEC = 30;
 
 /**
  * 題目類別。順序與顏色對應活動主視覺上那六張卡片。

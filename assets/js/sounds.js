@@ -21,8 +21,8 @@ export async function unlock() {
   }
   if (ctx.state === "suspended") await ctx.resume();
   enabled = ctx.state === "running";
-  // 先把 BGM 接起來開始緩衝，第一題才不會卡在下載
-  if (enabled) ensureBgm();
+  // 先把音樂接起來開始緩衝、撞擊聲先解碼好，正式要用時才不會卡住
+  if (enabled) { quizBgm.prime(); revealBgm.prime(); loadRevealSfx(); }
   return enabled;
 }
 
@@ -92,69 +92,114 @@ export function tick(left) {
 }
 
 // ============================================================
-//  作答背景音樂
+//  音檔類音樂／音效
 //  ------------------------------------------------------------
-//  播 assets/audio/bgm-quiz.mp3，接到 master 上，setVolume() 一樣管得到。
-//  開放作答時淡入，截止時淡出 —— 直接 pause 會「喀」一聲。
-//  路徑用 import.meta.url 解析，之後換別頁引用這個模組也不會斷。
+//  長的（作答、解說背景音樂）用 <audio> 串流，接進 master 後淡入淡出；
+//  短的（公布答案的撞擊聲）先整段解碼成 buffer，觸發時零延遲。
+//  路徑一律用 import.meta.url 解析，換哪一頁引用都不會斷。
 // ============================================================
 
-const BGM_URL  = new URL("../audio/bgm-quiz.mp3", import.meta.url).href;
-const BGM_GAIN = 0.5;      // 壓在主持人講話之下
-const FADE_IN  = 0.8;
-const FADE_OUT = 0.5;
-
-const bgm = { on: false, el: null, src: null, gain: null };
+const AUDIO = name => new URL(`../audio/${name}`, import.meta.url).href;
 
 /**
- * <audio> 與 MediaElementSource 都只建一次 ——
- * 同一個 <audio> 不能接第二次 createMediaElementSource，會直接丟例外。
+ * 一首可以淡入淡出的循環音樂。
+ * <audio> 與 MediaElementSource 都只建一次 —— 同一個元素接第二次
+ * createMediaElementSource 會丟 InvalidStateError。
  */
-function ensureBgm() {
-  if (!bgm.el) {
-    bgm.el = new Audio(BGM_URL);
-    bgm.el.loop = true;    // 題目時間比曲子長就接著繞回去
-    bgm.el.preload = "auto";
+function makeTrack(file, { volume = 0.5, fadeIn = 0.8, fadeOut = 0.5 } = {}) {
+  const t = { on: false, el: null, src: null, gain: null };
+
+  function ensure() {
+    if (!t.el) {
+      t.el = new Audio(AUDIO(file));
+      t.el.loop = true;          // 講解時間比曲子長就接著繞回去
+      t.el.preload = "auto";
+    }
+    if (!t.src && ctx) {
+      t.src  = ctx.createMediaElementSource(t.el);
+      t.gain = ctx.createGain();
+      t.gain.gain.value = 0.0001;
+      t.src.connect(t.gain).connect(master);
+    }
+    return t.el;
   }
-  if (!bgm.src && ctx) {
-    bgm.src  = ctx.createMediaElementSource(bgm.el);
-    bgm.gain = ctx.createGain();
-    bgm.gain.gain.value = 0.0001;
-    bgm.src.connect(bgm.gain).connect(master);
-  }
-  return bgm.el;
+
+  return {
+    /** 解鎖時先接起來開始緩衝，真正要播才不會卡在下載 */
+    prime() { if (enabled) ensure(); },
+
+    start() {
+      if (!enabled || t.on) return;
+      const el = ensure();
+      if (!t.gain) return;
+
+      t.on = true;
+      try { el.currentTime = 0; } catch { /* seek 不動就照樣播 */ }
+
+      const now = ctx.currentTime;
+      t.gain.gain.cancelScheduledValues(now);
+      t.gain.gain.setValueAtTime(0.0001, now);
+      t.gain.gain.exponentialRampToValueAtTime(volume, now + fadeIn);
+      el.play().catch(() => {});   // 沒解鎖就播不出來，不用吵
+    },
+
+    stop() {
+      if (!t.on) return;
+      t.on = false;
+      const el = t.el;
+      if (!el) return;
+      if (!enabled || !t.gain) { el.pause(); return; }
+
+      const now = ctx.currentTime;
+      t.gain.gain.cancelScheduledValues(now);
+      t.gain.gain.setValueAtTime(Math.max(t.gain.gain.value, 0.0001), now);
+      t.gain.gain.exponentialRampToValueAtTime(0.0001, now + fadeOut);
+      // 淡出跑完才 pause；期間又被重新叫起來就不要停
+      setTimeout(() => { if (!t.on) el.pause(); }, fadeOut * 1000 + 60);
+    }
+  };
 }
 
-/** 開放作答 → 從頭淡入 */
-export function startBgm() {
-  if (!enabled || bgm.on) return;
-  const el = ensureBgm();
-  if (!bgm.gain) return;
+const quizBgm   = makeTrack("bgm-quiz.mp3",   { volume: 0.5, fadeIn: 0.8, fadeOut: 0.5 });
+const revealBgm = makeTrack("bgm-reveal.mp3", { volume: 0.4, fadeIn: 1.2, fadeOut: 0.8 });
 
-  bgm.on = true;
-  try { el.currentTime = 0; } catch { /* 還沒 seek 得動就算了，照樣播 */ }
+/** 開放作答 → 緊張的循環 */
+export function startBgm() { quizBgm.start(); }
+export function stopBgm()  { quizBgm.stop();  }
 
-  const t = ctx.currentTime;
-  bgm.gain.gain.cancelScheduledValues(t);
-  bgm.gain.gain.setValueAtTime(0.0001, t);
-  bgm.gain.gain.exponentialRampToValueAtTime(BGM_GAIN, t + FADE_IN);
-  el.play().catch(() => {});   // 沒解鎖就播不出來，不用吵
+/** 公布答案後的講解 → 鋼琴弦樂鋪底，壓低一點讓主持人講得下去 */
+export function startRevealBgm() { revealBgm.start(); }
+export function stopRevealBgm()  { revealBgm.stop();  }
+
+// ---------- 一次性音效（整段解碼，觸發時零延遲） ----------
+
+const SFX_REVEAL_VOL = 0.8;
+let sfxRevealBuf = null;
+
+/** 解鎖後在背景把撞擊聲解碼好，公布答案那一刻才不會慢半拍 */
+async function loadRevealSfx() {
+  if (sfxRevealBuf || !ctx) return;
+  try {
+    const res = await fetch(AUDIO("sfx-reveal.mp3"));
+    sfxRevealBuf = await ctx.decodeAudioData(await res.arrayBuffer());
+  } catch { sfxRevealBuf = null; }   // 載不到就退回原本的合成和弦
 }
 
-/** 截止或換階段 → 淡出後才真的停 */
-export function stopBgm() {
-  if (!bgm.on) return;
-  bgm.on = false;
-  const el = bgm.el;
-  if (!el) return;
-  if (!enabled || !bgm.gain) { el.pause(); return; }
-
-  const t = ctx.currentTime;
-  bgm.gain.gain.cancelScheduledValues(t);
-  bgm.gain.gain.setValueAtTime(Math.max(bgm.gain.gain.value, 0.0001), t);
-  bgm.gain.gain.exponentialRampToValueAtTime(0.0001, t + FADE_OUT);
-  // 淡出跑完才 pause；期間又開了新的一題就不要停
-  setTimeout(() => { if (!bgm.on) el.pause(); }, FADE_OUT * 1000 + 60);
+/** 公布答案 —— 低沉的撞擊聲。音檔還沒好就先用合成音頂著。 */
+export function fanfare() {
+  if (!enabled) return;
+  if (!sfxRevealBuf) {
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((f, i) => blip({ freq: f, dur: 0.5, type: "triangle", gain: 0.26, at: i * 0.075 }));
+    noise({ dur: 0.45, gain: 0.1, hp: 1800, at: 0.25 });
+    return;
+  }
+  const src = ctx.createBufferSource();
+  const g   = ctx.createGain();
+  g.gain.value = SFX_REVEAL_VOL;
+  src.buffer = sfxRevealBuf;
+  src.connect(g).connect(master);
+  src.start(ctx.currentTime);
 }
 
 /** 某一組代表按下確認 —— 明亮的兩音上揚 */
@@ -216,13 +261,6 @@ export function timeUp() {
   // A 小調和弦收尾，給「結束了」的重量
   [110, 131, 165].forEach(f =>
     blip({ freq: f, dur: 0.8, type: "triangle", gain: 0.1, at: 0.02 }));
-}
-
-/** 公布答案 —— 上揚的和弦 */
-export function fanfare() {
-  const notes = [523, 659, 784, 1047];
-  notes.forEach((f, i) => blip({ freq: f, dur: 0.5, type: "triangle", gain: 0.26, at: i * 0.075 }));
-  noise({ dur: 0.45, gain: 0.1, hp: 1800, at: 0.25 });
 }
 
 /** 全部結束、公布排行榜 */
