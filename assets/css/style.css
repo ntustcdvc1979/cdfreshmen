@@ -13,6 +13,9 @@
   --cyan-lt: #8fd0ff;
   --ok: #2fd96b;
   --bad: #ff5470;
+
+  /* 上台代表的紅色版面（玩家端整頁與投影規則頁的示意手機共用） */
+  --bg-rep: linear-gradient(180deg, #3d0010 0%, #6b0a1e 55%, #2a0009 100%);
   --txt: #ffffff;
   --txt-dim: #a9bce8;
 
@@ -515,3 +518,71 @@ table.matrix td small { display: block; font-size: 11px; font-weight: 600; opaci
 
 .pulse { animation: pulse 1.8s ease-in-out infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+
+/* ============================================================
+   上台代表 —— 紅底版面
+   ------------------------------------------------------------
+   同一份定義給兩個地方用：
+     1. 玩家端代表的整頁  <body class="rep-theme">
+     2. 投影規則頁那支示意手機  <div class="phone-screen rep-theme">
+   所以代表手上看到的，跟規則頁畫給大家看的一定是同一套。
+   帶狀態的樣式（答對綠、已送出金、倒數警示）要留著不能蓋掉，
+   底下都用 :not() 讓那些狀態類別繼續贏。
+   ============================================================ */
+.rep-theme { background: var(--bg-rep); }
+
+/* 玩家端整頁：星點與光暈也換成紅的 */
+body.rep-theme {
+  background-color: #2a0009;
+  background-image:
+    radial-gradient(1.6px 1.6px at 12% 8%,  rgba(255,255,255,.85), transparent),
+    radial-gradient(1.4px 1.4px at 78% 14%, rgba(255,225,230,.7),  transparent),
+    radial-gradient(2px   2px   at 32% 22%, rgba(255,200,210,.8),  transparent),
+    radial-gradient(1.2px 1.2px at 88% 34%, rgba(255,255,255,.6),  transparent),
+    radial-gradient(1.6px 1.6px at 20% 52%, rgba(255,225,230,.7),  transparent),
+    radial-gradient(1.3px 1.3px at 66% 61%, rgba(255,200,210,.7),  transparent),
+    radial-gradient(1.8px 1.8px at 44% 78%, rgba(255,255,255,.65), transparent),
+    radial-gradient(1.2px 1.2px at 90% 88%, rgba(255,225,230,.6),  transparent),
+    radial-gradient(1.5px 1.5px at 8%  92%, rgba(255,200,210,.6),  transparent),
+    radial-gradient(ellipse 120% 70% at 50% 0%,   rgba(255,60,95,.45), transparent 70%),
+    radial-gradient(ellipse 100% 60% at 50% 100%, rgba(190,20,55,.45), transparent 70%),
+    linear-gradient(180deg, #3d0010 0%, #6b0a1e 45%, #2a0009 100%);
+}
+
+.rep-theme .card {
+  background: rgba(92,10,28,.72);
+  border-color: rgba(255,84,112,.45);
+}
+
+.rep-theme .qbadge {
+  background: linear-gradient(180deg, rgba(140,16,44,.95), rgba(74,4,20,.95));
+  border-color: var(--bad);
+  box-shadow: 0 0 18px rgba(255,84,112,.6);
+}
+
+/* 倒數的 warn / danger 配色要贏過主題色，這裡只動沒有狀態的那一種 */
+.rep-theme .timer { background: rgba(74,4,20,.8); }
+.rep-theme .timer:not(.warn):not(.danger) {
+  border-color: var(--bad);
+  box-shadow: 0 0 16px rgba(255,84,112,.5);
+}
+
+/* 答對綠、已送出金都保留原本的語意色 */
+.rep-theme .opt:not(.picked):not(.correct):not(.confirmed) {
+  border-color: rgba(255,84,112,.75);
+  background: linear-gradient(180deg, rgba(150,26,52,.95) 0%, rgba(88,8,26,.95) 100%);
+  box-shadow: 0 0 16px rgba(255,84,112,.4), inset 0 1px 0 rgba(255,255,255,.18);
+}
+.rep-theme .opt.picked {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgba(190,40,72,.95), rgba(120,14,38,.95));
+  box-shadow: 0 0 26px rgba(255,200,31,.8), inset 0 0 22px rgba(255,200,31,.25);
+}
+
+.rep-theme .bar-track {
+  background: rgba(60,0,14,.7);
+  border-color: rgba(255,84,112,.35);
+}
+.rep-theme .bar-fill:not(.is-correct) {
+  background: linear-gradient(90deg, #c0102e, #ff8fa2);
+}

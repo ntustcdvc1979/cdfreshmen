@@ -190,7 +190,7 @@ export const BLOCK_ALIGNS = [
 export const DEFAULT_BLOCK_SIZE = 3;
 
 /** 文字級距（vh）—— 投影頁還會再依實際高度縮放 */
-export const TEXT_SIZE_VH = { 1: 1.8, 2: 2.2, 3: 2.8, 4: 3.4, 5: 4.2 };
+export const TEXT_SIZE_VH = { 1: 1.8, 2: 2.2, 3: 2.8, 4: 3.4, 5: 5.4 };
 /** 圖片高度上限（vh） */
 export const IMG_SIZE_VH  = { 1: 9,   2: 14,  3: 19,  4: 25,  5: 32  };
 

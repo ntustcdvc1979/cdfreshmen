@@ -545,7 +545,7 @@ function phoneFigure(who) {
       <figure class="phone rep">
         <figcaption>🎤 上台代表</figcaption>
         <div class="phones">
-          <div class="phone-screen">
+          <div class="phone-screen rep-theme">
             ${qhead}
             <div class="card" style="margin-bottom:12px;">
               <strong class="title-gold" style="font-size:15px;">學員的選擇</strong>

@@ -50,6 +50,8 @@ let tickTimer = null;
 function goto(name) {
   for (const [k, el] of Object.entries(scr)) show(el, k === name);
   show($("#idbar"), !!(myGroup && myRole) && name !== "group" && name !== "role");
+  // 代表的整頁換成紅底 —— 跟投影規則頁畫的那支手機同一套樣式
+  document.body.classList.toggle("rep-theme", isRep());
 }
 
 function fail(err) {
@@ -172,7 +174,8 @@ $("#pick-member").addEventListener("click", async () => {
 // ------------------------------------------------------------
 //  主畫面切換
 // ------------------------------------------------------------
-const isRep = () => myRole === ROLE.REP;
+// 函式宣告而非 const —— goto() 在 boot 階段就會呼叫它，箭頭函式會踩到 TDZ
+function isRep() { return myRole === ROLE.REP; }
 
 function paintIdBar() {
   $("#id-group").textContent = groups[myGroup]?.name || "—";
