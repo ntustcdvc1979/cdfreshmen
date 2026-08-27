@@ -10,7 +10,7 @@ import {
   db, auth, ref, onValue, onAuthStateChanged,
   PATH, PHASE, LISTS, LETTERS, DEFAULT_LIMIT_SEC, CATEGORIES,
   categoryOf, questionsOf, tallyAllMembers, secondsLeft, isHost, ptsOf,
-  blocksOf, groupBlocks, isSoloMedia, videoEmbed, webpSrc, TEXT_SIZE_VH, IMG_SIZE_VH,
+  blocksOf, groupBlocks, isSoloMedia, videoEmbed, isVideoUrl, webpSrc, TEXT_SIZE_VH, IMG_SIZE_VH,
   gridColumns, buildScoreboard, categoryMatrix, groupBestCategories, columnWinners,
   wheelPool, $, show, escapeHtml, toSortedList
 } from "./common.js";
@@ -54,8 +54,10 @@ $("#btn-nosound").addEventListener("click", e => {
 });
 
 /** 影片一律先靜音自動播（不然會被瀏覽器擋掉），解鎖後才打開聲音 */
-function unmuteThemeVideo() {
-  const v = $("#s-themevid");
+function unmuteThemeVideo() { unmuteVideo("#s-themevid"); }
+
+function unmuteVideo(sel) {
+  const v = $(sel);
   if (!v) return;
   v.muted = false;
   v.volume = 1;
@@ -398,7 +400,7 @@ function revealPages(q) {
 
 const PAGE_NAME = {
   answer:    "答案與說明",
-  fullimg:   "補充大圖",
+  fullimg:   "補充說明",
   standings: "目前戰況",
   dist:      "全場作答分布"
 };
@@ -816,6 +818,12 @@ function paintRevealPage(qid, q) {
   const pages = revealPages(q);
   revealPage = Math.min(revealPage, pages.length - 1);
 
+  // 補充說明放影片的那一頁，影片有自己的聲音，講解音樂先讓開；
+  // 翻到別頁再接回來（start／stop 本身都有防重入，每次重畫呼叫都沒差）
+  const onVideo = pages[revealPage] === "fullimg" && isVideoUrl((q?.exImgFull || "").trim());
+  if (onVideo) snd.stopRevealBgm();
+  else         snd.startRevealBgm();
+
   ({ answer: paintReveal, fullimg: paintFullImage, standings: paintStandings, dist: paintDistribution })
     [pages[revealPage]](qid, q);
 
@@ -909,6 +917,10 @@ function fitBlocks(el) {
 
 function paintFullImage(qid, q) {
   foot.textContent = "補充說明";
+
+  const url = (q.exImgFull || "").trim();
+  if (isVideoUrl(url)) return paintFullVideo(url);
+
   body.innerHTML = `
     <div class="fullimg">
       <img src="${escapeHtml(webpSrc(q.exImgFull))}"
@@ -916,6 +928,26 @@ function paintFullImage(qid, q) {
            alt="補充說明大圖"
            onerror="window.__imgErr(this, el => el.parentElement.innerHTML='<p class=&quot;hint&quot; style=&quot;font-size:2.6vh&quot;>圖片載不出來，請確認後台填的網址</p>')">
     </div>`;
+}
+
+/**
+ * 補充說明放影片：整頁播一次就好，不重播（不加 loop）。
+ * 資料一有更新就會重畫整頁，所以影片已經在播就別重建，否則會一直跳回第一幀。
+ */
+function paintFullVideo(url) {
+  if (body.querySelector("#s-fullvid")) return;
+
+  const v = videoEmbed(url);
+  body.innerHTML = v.kind === "embed"
+    ? `<div class="fullimg"><iframe id="s-fullvid" class="fullvid"
+         src="${escapeHtml(v.src)}&autoplay=1&playsinline=1" title="補充說明影片"
+         frameborder="0" allow="autoplay; encrypted-media; picture-in-picture"
+         allowfullscreen></iframe></div>`
+    : `<div class="fullimg"><video id="s-fullvid" class="fullvid"
+         src="${escapeHtml(v.src)}" autoplay muted playsinline controls
+         onerror="this.parentElement.innerHTML='<p class=&quot;hint&quot; style=&quot;font-size:2.6vh&quot;>影片載不出來，請確認後台填的網址</p>'"></video></div>`;
+
+  if (soundOn && v.kind === "file") unmuteVideo("#s-fullvid");
 }
 
 function paintDistribution(qid, q) {

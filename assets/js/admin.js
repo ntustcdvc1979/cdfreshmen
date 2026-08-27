@@ -7,7 +7,7 @@ import {
   signInWithGoogle, consumeRedirectResult, authErrorText, signOut, onAuthStateChanged,
   PATH, LETTERS, CATEGORIES, UNCATEGORIZED, LISTS, LIST_LABEL,
   categoryOf, listOf, questionsOf, parseBulkQuestions, ptsOf,
-  blocksOf, groupBlocks, isSoloMedia, videoEmbed, webpSrc, normalizeBlock,
+  blocksOf, groupBlocks, isSoloMedia, videoEmbed, isVideoUrl, webpSrc, normalizeBlock,
   BLOCK_TYPES, BLOCK_SIZES, DEFAULT_BLOCK_SIZE,
   BLOCK_WIDTHS, BLOCK_ALIGNS,
   TEXT_SIZE_VH, IMG_SIZE_VH,
@@ -57,7 +57,23 @@ $("#ed-eximgfull").addEventListener("input", paintPreview);
 function paintPreview() {
   const full = $("#ed-eximgfull").value.trim();
   show($("#ed-preview-full"), !!full);
-  if (full) setImg($("#ed-preview-full-img"), full);
+  if (!full) return;
+
+  // 填影片就預覽播放器，填圖片就預覽圖
+  const vid = isVideoUrl(full);
+  show($("#ed-preview-full-img"), !vid);
+  show($("#ed-preview-full-vid"), vid);
+  if (vid) {
+    const v = videoEmbed(full);
+    $("#ed-preview-full-vid").innerHTML = v.kind === "embed"
+      ? `<iframe src="${escapeHtml(v.src)}" title="整頁影片預覽" frameborder="0"
+           style="width:100%;height:100%;border:0" allowfullscreen></iframe>`
+      : `<video src="${escapeHtml(v.src)}" controls preload="metadata"
+           style="width:100%;height:100%"></video>`;
+  } else {
+    $("#ed-preview-full-vid").innerHTML = "";   // 停掉可能還在播的影片
+    setImg($("#ed-preview-full-img"), full);
+  }
 }
 
 // ============================================================
@@ -308,7 +324,8 @@ function paintQuestions() {
         ${ptsOf(q) !== 1 ? `<span class="flag ok">配分 +${ptsOf(q)}</span>` : ""}
         <span class="flag ${hasEx ? "ok" : "warn"}">${hasEx ? "有說明" : "⚠ 沒有說明"}</span>
         ${blks.length ? `<span class="flag">${blks.length} 個區塊${nImg ? `・${nImg} 圖` : ""}${nVid ? `・${nVid} 影片` : ""}</span>` : ""}
-        ${(q.exImgFull || "").trim() ? `<span class="flag">含整頁大圖</span>` : ""}
+        ${(q.exImgFull || "").trim()
+          ? `<span class="flag">${isVideoUrl(q.exImgFull) ? "含整頁影片" : "含整頁大圖"}</span>` : ""}
       </div>
       <div class="row" style="margin-top:10px;">
         <button class="btn ghost mini q-edit">編輯</button>

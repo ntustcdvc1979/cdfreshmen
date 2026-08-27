@@ -225,6 +225,18 @@ export function videoEmbed(url) {
   return { kind: "file", src: u };
 }
 
+const VIDEO_EXT = /\.(mp4|webm|ogv|ogg|mov|m4v)(\?|#|$)/i;
+
+/**
+ * 這個網址看起來是影片嗎？ —— YouTube／Vimeo，或常見的影片副檔名。
+ * 「補充說明大圖」那一欄用它判斷要放圖還是放影片。
+ */
+export function isVideoUrl(url) {
+  const u = (url || "").trim();
+  if (!u) return false;
+  return videoEmbed(u).kind === "embed" || VIDEO_EXT.test(u);
+}
+
 /**
  * 站內圖片全部轉成 .webp 了，但後台資料庫裡可能還存著舊的 .png / .jpg 路徑。
  * 這裡先把副檔名換成 .webp，載不到時再由 onerror 退回原本的路徑 ——

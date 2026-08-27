@@ -7,7 +7,7 @@ import {
   buildScoreboard, categoryMatrix, categoryChampions, groupBestCategories, columnWinners,
   scoreOne, tallyMembers, tallyAllMembers, tallyReps, categoryOf, parseBulkQuestions,
   questionsOf, listOf, gridColumns, secondsLeft, ptsOf, LISTS,
-  blocksOf, normalizeBlock, groupBlocks, videoEmbed, isSoloMedia, webpSrc
+  blocksOf, normalizeBlock, groupBlocks, videoEmbed, isSoloMedia, webpSrc, isVideoUrl
 } from "./assets/js/common.js";
 
 const log = [];
@@ -285,6 +285,18 @@ ok("mp4 檔案原樣當成檔案播放",
    VE("assets/video/x.mp4").kind === "file" && VE("assets/video/x.mp4").src === "assets/video/x.mp4");
 ok("空網址不會爆", VE("").kind === "file" && VE("").src === "");
 ok("非影片網站當成檔案", VE("https://example.com/a.webm").kind === "file");
+
+// ---- 8d1. 補充說明大圖那一欄：是圖還是影片 ----
+ok("YouTube 網址算影片", isVideoUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
+ok("youtu.be 算影片", isVideoUrl("https://youtu.be/abc123XYZ"));
+ok("Vimeo 算影片", isVideoUrl("https://vimeo.com/123456789"));
+ok("mp4 算影片", isVideoUrl("assets/video/x.mp4"));
+ok("webm／mov 也算", isVideoUrl("a/b.webm") && isVideoUrl("a/b.MOV"));
+ok("帶查詢字串的 mp4 也算", isVideoUrl("https://x.com/a.mp4?token=1"));
+ok("webp 不算影片", !isVideoUrl("assets/img/explain/a.webp"));
+ok("png／jpg 不算影片", !isVideoUrl("a.png") && !isVideoUrl("a.jpg"));
+ok("空字串不算影片", !isVideoUrl("") && !isVideoUrl(null) && !isVideoUrl(undefined));
+ok("純網域不算影片", !isVideoUrl("https://example.com/hello"));
 
 // ---- 8d2. 圖片路徑先試 webp ----
 ok("站內 png 換成 webp", webpSrc("assets/img/explain/a.png") === "assets/img/explain/a.webp");
