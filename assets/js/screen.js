@@ -38,15 +38,29 @@ let podiumStep = 0;   // 排行榜：0 還沒開始 → 3 全部揭曉 → 4 類
 // ------------------------------------------------------------
 //  音效解鎖
 // ------------------------------------------------------------
+// 開場影片也要有聲音，但瀏覽器一樣要先有一次點擊 —— 沿用這道門
+let soundOn = false;
+
 show($("#sound-gate"), true);
 $("#btn-sound").addEventListener("click", async () => {
   await snd.unlock();
+  soundOn = true;
   show($("#sound-gate"), false);
+  unmuteThemeVideo();
 });
 $("#btn-nosound").addEventListener("click", e => {
   e.preventDefault();
   show($("#sound-gate"), false);
 });
+
+/** 影片一律先靜音自動播（不然會被瀏覽器擋掉），解鎖後才打開聲音 */
+function unmuteThemeVideo() {
+  const v = $("#s-themevid");
+  if (!v) return;
+  v.muted = false;
+  v.volume = 1;
+  v.play?.().catch(() => {});
+}
 
 // ------------------------------------------------------------
 //  登入與資料
@@ -420,9 +434,15 @@ function paintIntro() {
 
 /** 第一頁：六大主題。整張主視覺直接滿版鋪滿投影畫面。 */
 function paintThemes() {
+  // 資料一有更新就會重畫整頁；影片已經在播就別重建，否則會一直跳回第一幀
+  if (body.querySelector("#s-themevid, .themes")) return;
+
   body.innerHTML = `
-    <video class="bleed-img" src="assets/video/themes.mp4" autoplay loop muted playsinline
+    <video class="bleed-img" id="s-themevid" src="assets/video/themes.mp4"
+         autoplay loop muted playsinline
          onerror="this.outerHTML = '<div class=&quot;themes&quot;>' + window.__themesFallback + '</div>'"></video>`;
+
+  if (soundOn) unmuteThemeVideo();
 }
 
 // 圖載不出來時的備援：用類別色重畫六張卡，不會開天窗
@@ -440,20 +460,30 @@ function paintRules() {
   body.innerHTML = `
     <h2 class="title-gold intro-title">★ 遊戲規則 ★</h2>
     <div class="rules">
-      <ol>
-        <li>每組推派 <b>一位上台代表</b>，其餘是 <b>台下學員</b>。</li>
-        <li>題目出現後開始 <b>倒數</b>，台下學員在手機上選 A／B／C／D。</li>
-        <li>代表看得到自己這組的 <b>即時選擇比例</b>，再決定最終答案。</li>
-        <li>代表按下 <b>確認送出</b> —— 送出後不能更改，並立刻顯示在螢幕上。</li>
-        <li>代表答對 <b>+1 分</b>。</li>
-        <li>台下學員答對率過半，<b>再 +1 分</b>。</li>
-      </ol>
+      <div class="ruleside">
+        <ol>
+          <li>每組推派 <b>一位上台代表</b>，其餘是 <b>台下學員</b>。</li>
+          <li>題目出現後開始 <b>倒數</b>，台下學員在手機上選 A／B／C／D。</li>
+          <li>代表看得到自己這組的 <b>即時選擇比例</b>，再決定最終答案。</li>
+          <li>代表按下 <b>確認送出</b> —— 送出後不能更改，並立刻顯示在螢幕上。</li>
+          <li>代表答對 <b>+1 分</b>。</li>
+          <li>台下學員答對率過半，<b>再 +1 分</b>。</li>
+        </ol>
+        <div class="qr-mini">
+          <div class="qrbox"><img id="s-qr" alt="玩家端 QR Code"></div>
+          <div class="cap">
+            <b>📱 還沒進場的現在就掃</b>
+            <span>${escapeHtml(playerUrl)}</span>
+          </div>
+        </div>
+      </div>
       <div class="pic" id="s-rulepic">${img
         ? `<img src="${escapeHtml(img)}" alt="規則說明圖"
              onerror="this.replaceWith(document.createRange().createContextualFragment(phoneMockHtml()))">`
         : phoneMockHtml()}</div>
     </div>`;
 
+  paintQr();
   fitPhones();
 }
 
