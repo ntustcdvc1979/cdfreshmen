@@ -611,3 +611,40 @@ export function secondsLeft(openedAt, limitSec = DEFAULT_LIMIT_SEC, offset = 0) 
   const left = limitSec - (now - openedAt) / 1000;
   return Math.max(0, Math.ceil(left));
 }
+
+// ============================================================
+//  加倍轉盤
+// ============================================================
+
+/**
+ * [0, n) 的均勻亂數。
+ * Math.random() 在同一輪裡很容易讓人覺得「又是他」，這裡改用 crypto，
+ * 並且把會造成偏差的尾段丟掉重抽 —— 直接取餘數的話小的索引機率會偏高。
+ */
+export function randomIndex(n) {
+  if (n <= 1) return 0;
+  const c = globalThis.crypto;
+  if (!c?.getRandomValues) return Math.floor(Math.random() * n);
+
+  const limit = Math.floor(0xFFFFFFFF / n) * n;
+  const buf = new Uint32Array(1);
+  let v;
+  do { c.getRandomValues(buf); v = buf[0]; } while (v >= limit);
+  return v % n;
+}
+
+/**
+ * 轉盤上還留著的組：抽過的就不再出現。
+ * 已經抽過 = 出現在 /doubles 裡（那是每一題實際加倍到哪一組的紀錄）。
+ * 全部都抽過了就重新開一輪，否則轉盤會變成空的。
+ *
+ * 主持人端與投影端都用這一支，兩邊的格子才會完全一致 ——
+ * 不一致的話轉盤會停在別人的名字上。
+ */
+export function wheelPool(groups, doubles) {
+  const all = toSortedList(groups);
+  if (!all.length) return [];
+  const used = new Set(Object.values(doubles || {}));
+  const left = all.filter(g => !used.has(g.id));
+  return left.length ? left : all;
+}

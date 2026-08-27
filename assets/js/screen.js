@@ -12,7 +12,7 @@ import {
   categoryOf, questionsOf, tallyAllMembers, secondsLeft, isHost, ptsOf,
   blocksOf, groupBlocks, isSoloMedia, videoEmbed, TEXT_SIZE_VH, IMG_SIZE_VH,
   gridColumns, buildScoreboard, categoryMatrix, groupBestCategories, columnWinners,
-  $, show, escapeHtml, toSortedList
+  wheelPool, $, show, escapeHtml, toSortedList
 } from "./common.js";
 
 import * as snd from "./sounds.js";
@@ -141,6 +141,7 @@ let lastWheelId = null;
 
 function closeWheel() {
   document.querySelector(".wheel-overlay")?.remove();
+  snd.stopWheelBgm();
 }
 
 function onWheel() {
@@ -156,17 +157,25 @@ function onWheel() {
 
 /** 主持人按下轉盤 → 全螢幕蓋上轉盤並轉到指定的組 */
 function spinWheel(targetGid) {
-  const gl = toSortedList(groups);
+  // 轉盤上只留還沒抽過的組（跟主持人端同一支邏輯）。
+  // 萬一兩邊的 /doubles 有一瞬間不同步、目標不在池子裡，就把它補回去 ——
+  // 否則 findIndex 會是 -1，轉盤會停在別人的名字上。
+  const gl = wheelPool(groups, doubles);
+  if (!gl.some(g => g.id === targetGid) && groups[targetGid]) {
+    gl.push({ id: targetGid, ...groups[targetGid] });
+  }
   if (!gl.length) return;
+
   const n = gl.length;
   const idx = Math.max(0, gl.findIndex(g => g.id === targetGid));
   const seg = 360 / n;
 
   document.querySelector(".wheel-overlay")?.remove();
+  snd.stopWheelBgm();
   const ov = document.createElement("div");
   ov.className = "wheel-overlay";
   ov.innerHTML = `
-    <h2 class="title-gold"><span class="emoji">🎡</span> 分數加倍轉盤 <span class="emoji">🎡</span></h2>
+    <h2 class="title-gold"><span class="emoji">🎡</span> 分數<span class="dbl-word">Double</span>轉盤 <span class="emoji">🎡</span></h2>
     <div class="wheel-stage">
       <div class="wheel-ptr"></div>
       <div class="wheel-hub">×2</div>
@@ -177,6 +186,7 @@ function spinWheel(targetGid) {
     <div class="wheel-result pending" id="wheel-result">轉盤轉動中…</div>
     <p class="wheel-hint" id="wheel-hint"></p>`;
   stage.appendChild(ov);
+  snd.startWheelBgm();
 
   // 幾何：wheelSvg 從 -90°（12 點鐘）開始順時針排，
   // 所以第 i 格的中心在「順時針 i*seg + seg/2 度」的位置。

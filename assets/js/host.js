@@ -8,7 +8,8 @@ import {
   PATH, PHASE, LISTS, LIST_LABEL, LETTERS, DEFAULT_LIMIT_SEC,
   categoryOf, questionsOf, tallyAllMembers, tallyReps, scoreOne, secondsLeft, ptsOf,
   buildScoreboard, categoryMatrix, categoryChampions, groupBestCategories, columnWinners,
-  isHost, notHostHtml, $, show, toast, toSortedList, escapeHtml
+  isHost, notHostHtml, $, show, toast, toSortedList, escapeHtml,
+  wheelPool, randomIndex
 } from "./common.js";
 
 let groups = {}, questions = {}, keys = {}, allResp = {}, repAns = {}, reps = {}, state = {}, doubles = {};
@@ -142,15 +143,19 @@ $("#btn-reveal").addEventListener("click", doReveal);
 $("#btn-final").addEventListener("click", doFinal);
 // ---- 加倍轉盤 ----
 $("#btn-wheel").addEventListener("click", async () => {
-  const gl = toSortedList(groups);
-  if (!gl.length) { toast("後台還沒建立組別"); return; }
+  // 抽過的組不再放進轉盤；全部抽完會自動重開一輪
+  const pool = wheelPool(groups, doubles);
+  if (!pool.length) { toast("後台還沒建立組別"); return; }
+
   // 由主持人端抽，寫進 state 讓投影幕轉到同一格 —— 各個畫面才會一致
-  const pick = gl[Math.floor(Math.random() * gl.length)];
+  const pick = pool[randomIndex(pool.length)];
   await update(ref(db, PATH.state), {
     pendingDouble: pick.id,
     wheel: { id: Date.now(), gid: pick.id }
   });
-  toast("轉盤：" + pick.name + " 下一題 ×2");
+
+  const total = toSortedList(groups).length;
+  toast(`轉盤：${pick.name} 下一題 ×2（還沒抽過的剩 ${pool.length - 1}／${total} 組）`);
 });
 
 $("#btn-wheel-clear").addEventListener("click", async () => {
