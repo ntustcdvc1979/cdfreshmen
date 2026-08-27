@@ -421,8 +421,8 @@ function paintIntro() {
 /** 第一頁：六大主題。整張主視覺直接滿版鋪滿投影畫面。 */
 function paintThemes() {
   body.innerHTML = `
-    <img class="bleed-img" src="assets/img/themes.jpg" alt="六大主題"
-         onerror="this.outerHTML = '<div class=&quot;themes&quot;>' + window.__themesFallback + '</div>'">`;
+    <video class="bleed-img" src="assets/video/themes.mp4" autoplay loop muted playsinline
+         onerror="this.outerHTML = '<div class=&quot;themes&quot;>' + window.__themesFallback + '</div>'"></video>`;
 }
 
 // 圖載不出來時的備援：用類別色重畫六張卡，不會開天窗
