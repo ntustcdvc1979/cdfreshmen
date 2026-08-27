@@ -424,6 +424,8 @@ function renderReveal(qid, q) {
 
   const repaint = () => {
     $("#r-letter").textContent = key || "—";
+    // 字母下面補上該選項的文字，跟投影幕一致
+    $("#r-opt").textContent = key ? (q[String(key).toLowerCase()] || "").trim() : "";
 
     const s = scoreOne(key, repAns, members,
       doubles[qid] === myGroup ? ptsOf(q) * 2 : ptsOf(q));

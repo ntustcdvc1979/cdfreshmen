@@ -10,7 +10,7 @@ import {
   db, auth, ref, onValue, onAuthStateChanged,
   PATH, PHASE, LISTS, LETTERS, DEFAULT_LIMIT_SEC, CATEGORIES,
   categoryOf, questionsOf, tallyAllMembers, secondsLeft, isHost, ptsOf,
-  blocksOf, groupBlocks, isSoloMedia, videoEmbed, TEXT_SIZE_VH, IMG_SIZE_VH,
+  blocksOf, groupBlocks, isSoloMedia, videoEmbed, webpSrc, TEXT_SIZE_VH, IMG_SIZE_VH,
   gridColumns, buildScoreboard, categoryMatrix, groupBestCategories, columnWinners,
   wheelPool, $, show, escapeHtml, toSortedList
 } from "./common.js";
@@ -140,8 +140,26 @@ function onStateChange() {
 let lastWheelId = null;
 
 function closeWheel() {
+  const had = !!document.querySelector(".wheel-overlay");
   document.querySelector(".wheel-overlay")?.remove();
   snd.stopWheelBgm();
+  if (had) resumePhaseBgm();     // 轉盤收掉，把該階段原本的音樂接回來
+}
+
+/** 轉盤只留自己的音樂，其他階段的背景音樂先全部收掉 */
+function soloWheelBgm() {
+  snd.stopBgm();
+  snd.stopRevealBgm();
+  snd.stopFinalBgm();
+  snd.startWheelBgm();
+}
+
+/** 轉盤結束後，依目前階段把背景音樂接回來（start 本身有防重入） */
+function resumePhaseBgm() {
+  const p = state.phase;
+  if (p === PHASE.OPEN)        snd.startBgm();
+  else if (p === PHASE.REVEAL) snd.startRevealBgm();
+  else if (p === PHASE.FINAL)  snd.startFinalBgm();
 }
 
 function onWheel() {
@@ -186,7 +204,7 @@ function spinWheel(targetGid) {
     <div class="wheel-result pending" id="wheel-result">轉盤轉動中…</div>
     <p class="wheel-hint" id="wheel-hint"></p>`;
   stage.appendChild(ov);
-  snd.startWheelBgm();
+  soloWheelBgm();
 
   // 幾何：wheelSvg 從 -90°（12 點鐘）開始順時針排，
   // 所以第 i 格的中心在「順時針 i*seg + seg/2 度」的位置。
@@ -506,9 +524,10 @@ function paintRules() {
       ? `<div class="rules">
            ${middle}
            <div class="pic">
-             <img src="${escapeHtml(img)}" alt="規則說明圖"
-                  onerror="this.replaceWith(document.createRange()
-                    .createContextualFragment(window.__phonesFallback()))">
+             <img src="${escapeHtml(webpSrc(img))}"
+                  data-fallback="${webpSrc(img) !== img ? escapeHtml(img) : ""}" alt="規則說明圖"
+                  onerror="window.__imgErr(this, el => el.replaceWith(document.createRange()
+                    .createContextualFragment(window.__phonesFallback())))">
            </div>
          </div>`
       : `<div class="rules rules-3col">
@@ -531,6 +550,18 @@ function phoneMockHtml(...who) {
 
 // inline 的 onerror 是在全域執行的，module 內的函式它看不到 —— 得掛到 window 上
 window.__phonesFallback = () => phoneMockHtml("member", "rep");
+
+/**
+ * 圖片載不到時：先退回原始副檔名（.webp → 原本的 .png/.jpg），
+ * 還是不行才交給 whenGone 收尾。
+ */
+window.__imgErr = function (img, whenGone) {
+  const back = img.dataset.fallback;
+  if (back) { img.dataset.fallback = ""; img.src = back; return; }
+  whenGone(img);
+};
+window.__imgFail = img => img.replaceWith(Object.assign(
+  document.createElement("span"), { className: "imgfail", textContent: "圖片載不出來" }));
 
 /** who："member" 台下學員／"rep" 上台代表（紅底，多一塊學員選擇比例） */
 function phoneFigure(who) {
@@ -804,6 +835,7 @@ function paintReveal(qid, q) {
       <div class="reveal-ans">
         <div class="title-gold" style="font-size:2.8vh;"><span class="emoji">🎉</span> 正確答案 <span class="emoji">🎉</span></div>
         <div class="reveal-letter">${key || "—"}</div>
+        ${optionText(q, key) ? `<div class="reveal-opt">${escapeHtml(optionText(q, key))}</div>` : ""}
       </div>
       <div class="reveal-ex">
         <h3 class="title-gold" style="font-size:3vh; margin:0 0 1vh;"><span class="emoji">💡</span> 說明</h3>
@@ -813,7 +845,16 @@ function paintReveal(qid, q) {
     <div class="grid" id="s-grid" style="flex:0 0 26vh;"></div>`;
 
   fitBlocks($("#s-exblocks"));
+  // 選項文字太長就縮到那一欄塞得下
+  const opt = $(".reveal-opt");
+  if (opt) fitToBox(opt, $(".reveal-ans"), "--ofs", 2.8, 1.2);
   paintGrid(qid, true);
+}
+
+/** 取出正解那個選項的文字，例如 key = "B" → q.b */
+function optionText(q, key) {
+  if (!q || !key) return "";
+  return (q[String(key).toLowerCase()] || "").trim();
 }
 
 /**
@@ -828,10 +869,10 @@ function blocksHtml(q) {
   const one = b => {
     const cls = `exblock ${b.w} ${b.align}`;
     if (b.t === "img") {
-      return `<div class="${cls}"><img src="${escapeHtml(b.v)}" alt=""
+      return `<div class="${cls}"><img src="${escapeHtml(webpSrc(b.v))}"
+        data-fallback="${webpSrc(b.v) !== b.v ? escapeHtml(b.v) : ""}" alt=""
         style="--ih:${IMG_SIZE_VH[b.size]}vh"
-        onerror="this.replaceWith(Object.assign(document.createElement('span'),
-          {className:'imgfail', textContent:'圖片載不出來'}))"></div>`;
+        onerror="window.__imgErr(this, window.__imgFail)"></div>`;
     }
     if (b.t === "video") {
       const v = videoEmbed(b.v);
@@ -870,8 +911,10 @@ function paintFullImage(qid, q) {
   foot.textContent = "補充說明";
   body.innerHTML = `
     <div class="fullimg">
-      <img src="${escapeHtml(q.exImgFull)}" alt="補充說明大圖"
-           onerror="this.parentElement.innerHTML='<p class=&quot;hint&quot; style=&quot;font-size:2.6vh&quot;>圖片載不出來，請確認後台填的網址</p>'">
+      <img src="${escapeHtml(webpSrc(q.exImgFull))}"
+           data-fallback="${webpSrc(q.exImgFull) !== q.exImgFull ? escapeHtml(q.exImgFull) : ""}"
+           alt="補充說明大圖"
+           onerror="window.__imgErr(this, el => el.parentElement.innerHTML='<p class=&quot;hint&quot; style=&quot;font-size:2.6vh&quot;>圖片載不出來，請確認後台填的網址</p>')">
     </div>`;
 }
 

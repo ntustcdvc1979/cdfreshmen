@@ -7,7 +7,7 @@ import {
   buildScoreboard, categoryMatrix, categoryChampions, groupBestCategories, columnWinners,
   scoreOne, tallyMembers, tallyAllMembers, tallyReps, categoryOf, parseBulkQuestions,
   questionsOf, listOf, gridColumns, secondsLeft, ptsOf, LISTS,
-  blocksOf, normalizeBlock, groupBlocks, videoEmbed, isSoloMedia
+  blocksOf, normalizeBlock, groupBlocks, videoEmbed, isSoloMedia, webpSrc
 } from "./assets/js/common.js";
 
 const log = [];
@@ -285,6 +285,18 @@ ok("mp4 檔案原樣當成檔案播放",
    VE("assets/video/x.mp4").kind === "file" && VE("assets/video/x.mp4").src === "assets/video/x.mp4");
 ok("空網址不會爆", VE("").kind === "file" && VE("").src === "");
 ok("非影片網站當成檔案", VE("https://example.com/a.webm").kind === "file");
+
+// ---- 8d2. 圖片路徑先試 webp ----
+ok("站內 png 換成 webp", webpSrc("assets/img/explain/a.png") === "assets/img/explain/a.webp");
+ok("站內 jpg 換成 webp", webpSrc("assets/img/hero.jpg") === "assets/img/hero.webp");
+ok("jpeg 也換", webpSrc("x/y.JPEG") === "x/y.webp");
+ok("已經是 webp 就不動", webpSrc("a/b.webp") === "a/b.webp");
+ok("外部 http 網址不動", webpSrc("https://example.com/a.png") === "https://example.com/a.png");
+ok("外部 // 網址不動", webpSrc("//cdn.example.com/a.jpg") === "//cdn.example.com/a.jpg");
+ok("data URI 不動", webpSrc("data:image/png;base64,AAA") === "data:image/png;base64,AAA");
+ok("檔名中間有 .png 不會被誤換", webpSrc("img/a.png.backup.jpg") === "img/a.png.backup.webp");
+ok("空字串安全", webpSrc("") === "" && webpSrc(null) === "" && webpSrc(undefined) === "");
+ok("非圖片副檔名不動", webpSrc("assets/video/a.mp4") === "assets/video/a.mp4");
 
 // ---- 8e. 只有一張圖／一段影片 → 佔滿說明區 ----
 const NB = a => a.map(normalizeBlock);

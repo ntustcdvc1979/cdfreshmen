@@ -7,7 +7,7 @@ import {
   signInWithGoogle, consumeRedirectResult, authErrorText, signOut, onAuthStateChanged,
   PATH, LETTERS, CATEGORIES, UNCATEGORIZED, LISTS, LIST_LABEL,
   categoryOf, listOf, questionsOf, parseBulkQuestions, ptsOf,
-  blocksOf, groupBlocks, isSoloMedia, videoEmbed, normalizeBlock,
+  blocksOf, groupBlocks, isSoloMedia, videoEmbed, webpSrc, normalizeBlock,
   BLOCK_TYPES, BLOCK_SIZES, DEFAULT_BLOCK_SIZE,
   BLOCK_WIDTHS, BLOCK_ALIGNS,
   TEXT_SIZE_VH, IMG_SIZE_VH,
@@ -32,12 +32,19 @@ $("#sel-list").addEventListener("change", () => {
   closeEditor();
 });
 
+/** 預覽圖一律先試 .webp，載不到再退回原本填的路徑 */
+function setImg(el, url) {
+  const web = webpSrc(url);
+  el.onerror = () => { el.onerror = null; if (web !== url) el.src = url; };
+  el.src = web;
+}
+
 // 開場規則圖
 $("#in-rulesimg").addEventListener("input", paintRulesPreview);
 function paintRulesPreview() {
   const url = $("#in-rulesimg").value.trim();
   show($("#rules-preview"), !!url);
-  if (url) $("#rules-preview-img").src = url;
+  if (url) setImg($("#rules-preview-img"), url);
 }
 $("#btn-rulesimg").addEventListener("click", async () => {
   const url = $("#in-rulesimg").value.trim();
@@ -50,7 +57,7 @@ $("#ed-eximgfull").addEventListener("input", paintPreview);
 function paintPreview() {
   const full = $("#ed-eximgfull").value.trim();
   show($("#ed-preview-full"), !!full);
-  if (full) $("#ed-preview-full-img").src = full;
+  if (full) setImg($("#ed-preview-full-img"), full);
 }
 
 // ============================================================
@@ -91,7 +98,7 @@ function paintBlocks() {
         <button class="btn danger mini blk-del">刪除</button>
       </div>
       ${b.t === "img"
-        ? `<input class="blk-v" value="${escapeHtml(b.v)}" placeholder="https://… 或 assets/img/explain/檔名.png">`
+        ? `<input class="blk-v" value="${escapeHtml(b.v)}" placeholder="https://… 或 assets/img/explain/檔名.webp">`
         : b.t === "video"
         ? `<input class="blk-v" value="${escapeHtml(b.v)}" placeholder="YouTube／Vimeo 網址，或 assets/video/檔名.mp4">`
         : `<textarea class="blk-v" placeholder="${b.t === "head" ? "小標題文字" : "說明內容，可以換行"}">${escapeHtml(b.v)}</textarea>`}
@@ -145,7 +152,9 @@ function paintBlockPreview() {
   const one = b => {
     const cls = `exblock ${b.w} ${b.align}`;
     if (b.t === "img") {
-      return `<div class="${cls}"><img src="${escapeHtml(b.v)}" alt=""
+      return `<div class="${cls}"><img src="${escapeHtml(webpSrc(b.v))}"
+        data-fallback="${webpSrc(b.v) !== b.v ? escapeHtml(b.v) : ""}" alt=""
+        onerror="const f=this.dataset.fallback; if(f){this.dataset.fallback='';this.src=f;}"
         style="--ih:${(IMG_SIZE_VH[b.size] * k).toFixed(1)}vh"></div>`;
     }
     if (b.t === "video") {

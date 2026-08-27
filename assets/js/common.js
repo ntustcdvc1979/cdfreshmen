@@ -225,6 +225,17 @@ export function videoEmbed(url) {
   return { kind: "file", src: u };
 }
 
+/**
+ * 站內圖片全部轉成 .webp 了，但後台資料庫裡可能還存著舊的 .png / .jpg 路徑。
+ * 這裡先把副檔名換成 .webp，載不到時再由 onerror 退回原本的路徑 ——
+ * 這樣舊題目不用重填，之後新放的 png 也照樣顯示。外部網址不動。
+ */
+export function webpSrc(url) {
+  const u = (url || "").trim();
+  if (/^(https?:)?\/\//i.test(u) || /^data:/i.test(u)) return u;
+  return u.replace(/\.(png|jpe?g)$/i, ".webp");
+}
+
 /** 說明只有一張圖或一段影片時 → 讓它佔滿整個說明區 */
 export function isSoloMedia(blocks) {
   return blocks.length === 1 && MEDIA_TYPES.includes(blocks[0].t);

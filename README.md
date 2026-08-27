@@ -203,8 +203,14 @@ GitHub repo → **Settings → Pages** → Source 選 **`GitHub Actions`**（不
    說明排版要匯入後逐題編輯（批次格式塞不下）。
 5. 圖片（說明區塊裡的圖、整頁大圖）都是選填。放法有兩種：
    - 貼一個外部圖片直連網址
-   - 把圖片檔放進 repo 的 `assets/img/explain/`，這裡填 `assets/img/explain/檔名.png`
+   - 把圖片檔放進 repo 的 `assets/img/explain/`，這裡填 `assets/img/explain/檔名.webp`
    （後台會即時預覽，貼錯會看到破圖；投影時載不出來會顯示提示文字而不是空白）
+
+   站內圖片一律存成 **.webp**（同樣畫質、檔案小很多，投影機和手機都載得比較快）。
+   轉檔：`cwebp -q 92 -m 6 -alpha_q 100 原圖.png -o 圖.webp`，
+   來源是 jpg 就用 `-q 85`（jpg 已經壓過，再用高品質重壓反而會變大）。
+   舊題目如果還填著 `.png` / `.jpg` 也不用改 —— 系統會自動先找同名的
+   `.webp`，找不到才用你填的原路徑。
    圖片的長寬比不用管，橫的、直的、超長的表格都會自動縮到剛好塞滿畫面。
 6. 用 `host.html` 的「顯示玩家端 QR Code」把 QR 存下來貼到 Canva 簡報。
 7. **先用 DEMO 題庫實際跑一輪**，確認代表都搶到位子、音效有出來。
@@ -322,10 +328,12 @@ assets/
   js/firebase-config.example.js  範本
   js/firebase-config.js          本機用，不進版控（.gitignore）
   js/common.js          Firebase 初始化、路徑、權限、計分、倒數、格子排版
-  js/sounds.js          Web Audio 音效合成
+  js/sounds.js          音效：提示音即時合成，背景音樂讀 assets/audio
   js/player.js  host.js  screen.js  admin.js
-  img/hero.jpg  logo.png  themes.jpg
-  img/explain/          （自己建）說明圖片放這裡
+  img/hero.webp  logo.webp  themes.webp
+  img/explain/          （自己建）說明圖片放這裡，一律用 .webp
+  audio/                背景音樂與音效檔
+  video/                本機影片檔（說明區塊選「影片」時可以指到這裡）
 ```
 
 ## 八、資料庫結構

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>投影統計｜大學星攻略</title>
-<link rel="icon" href="assets/img/logo.png">
+<link rel="icon" href="assets/img/logo.webp">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
 <style>
@@ -224,6 +224,13 @@
   .reveal-top { display: flex; gap: 2vw; align-items: stretch; flex: 1 1 auto; min-height: 0; }
   .reveal-ans { flex: 0 0 21%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .reveal-ans .reveal-letter { font-size: 20vh; }
+  /* 正解字母下面補上該選項的文字，長的就自己換行、由 --ofs 縮到塞得下 */
+  .reveal-ans .reveal-opt {
+    margin-top: .6vh; max-width: 100%;
+    font-size: var(--ofs, 2.8vh); font-weight: 900; line-height: 1.3;
+    color: var(--gold-lt); text-align: center;
+    overflow-wrap: anywhere;
+  }
   .reveal-ex {
     flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;
     border-left: .28vh solid rgba(255,200,31,.35); padding-left: 2vw;
@@ -611,7 +618,7 @@
   <div class="sweep"></div>
 
   <div class="top">
-    <img class="logo" src="assets/img/logo.png" alt="大學星攻略">
+    <img class="logo" src="assets/img/logo.webp" alt="大學星攻略">
     <span class="cat-pill" id="s-cat">—</span>
     <span class="pts-badge" id="s-pts" style="display:none">+1</span>
     <span class="dbl-pill" id="s-dbl" style="display:none">🎡 ×2</span>
