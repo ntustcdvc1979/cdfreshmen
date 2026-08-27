@@ -390,14 +390,29 @@
   }
   .rules .pic img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 1.2vh;
     box-shadow: 0 0 0 .3vh rgba(255,200,31,.4), 0 1.4vh 4vh rgba(0,0,0,.6); }
+  /* 預設版面：台下學員在左、規則在中、上台代表在右 */
+  .rules.rules-3col .pic     { flex: 0 0 25%; place-items: stretch; }
+  .rules.rules-3col .ruleside { flex: 1 1 auto; }
+  .rules.rules-3col li        { font-size: 2.8vh; }
+  .rules.rules-3col .qr-mini .qrbox img { width: 14vh; height: 14vh; }
+  .rules.rules-3col .qr-mini .cap b     { font-size: 2.4vh; }
 
   /* 手機作答示意：用學員端真正的元件樣式組出來，整體再縮放，
      所以跟他們手上看到的畫面一致 */
-  .phones { display: flex; gap: 22px; transform-origin: center center; }
-  .phone { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-  .phone figcaption { font-size: 19px; font-weight: 900; color: var(--gold-lt); white-space: nowrap; }
+  .phonerow { display: flex; gap: 22px; align-items: stretch;
+              width: 100%; height: 100%; min-height: 0; }
+  .phone { margin: 0; flex: 1 1 0; min-width: 0; min-height: 0;
+           display: flex; flex-direction: column; align-items: center; gap: 1.2vh; }
+  /* 標題留在縮放範圍外，兩支手機不管各自縮多少，標題都一樣大 */
+  .phone figcaption { flex: 0 0 auto; font-size: 3.2vh; font-weight: 900;
+                      color: var(--gold-lt); white-space: nowrap; }
+  /* 手機畫面用原尺寸組好，再由 fitPhones 整體縮進這個框 */
+  .phones { flex: 1 1 auto; min-height: 0; width: 100%;
+            display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr);
+            place-items: center; }
   .phone-screen {
     width: 340px;
+    transform-origin: center center;
     padding: 16px 14px 18px;
     border-radius: 30px;
     border: 7px solid #16265c;
@@ -411,6 +426,44 @@
   .phone-screen .qpanel { min-height: 92px; margin: 12px 0 14px; padding: 16px 14px; }
   .phone-screen .opts { gap: 9px; }
   .phone-screen .card { padding: 12px; }
+
+  /* 上台代表那支手機改紅底，跟台下學員一眼就分得出來。
+     只改這裡的示意圖，學員端真正的畫面不受影響。 */
+  .phone.rep .phone-screen {
+    border-color: #5e1524;
+    background: linear-gradient(180deg, #3d0010 0%, #6b0a1e 55%, #2a0009 100%);
+    box-shadow: 0 0 0 2px rgba(255,84,112,.45), 0 18px 50px rgba(0,0,0,.65);
+  }
+  .phone.rep figcaption { color: #ffb3c0; }
+  .phone.rep .phone-screen .card {
+    background: rgba(92,10,28,.72);
+    border-color: rgba(255,84,112,.45);
+  }
+  .phone.rep .phone-screen .qbadge {
+    background: linear-gradient(180deg, rgba(140,16,44,.95), rgba(74,4,20,.95));
+    border-color: var(--bad);
+    box-shadow: 0 0 18px rgba(255,84,112,.6);
+  }
+  .phone.rep .phone-screen .timer {
+    background: rgba(74,4,20,.8);
+    border-color: var(--bad);
+    box-shadow: 0 0 16px rgba(255,84,112,.5);
+  }
+  .phone.rep .phone-screen .opt {
+    border-color: rgba(255,84,112,.75);
+    background: linear-gradient(180deg, rgba(150,26,52,.95) 0%, rgba(88,8,26,.95) 100%);
+    box-shadow: 0 0 16px rgba(255,84,112,.4), inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .phone.rep .phone-screen .opt.picked {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, rgba(190,40,72,.95), rgba(120,14,38,.95));
+    box-shadow: 0 0 26px rgba(255,200,31,.8), inset 0 0 22px rgba(255,200,31,.25);
+  }
+  .phone.rep .phone-screen .bar-track {
+    background: rgba(60,0,14,.7);
+    border-color: rgba(255,84,112,.35);
+  }
+  .phone.rep .phone-screen .bar-fill { background: linear-gradient(90deg, #c0102e, #ff8fa2); }
 
   .joinpage { display: flex; gap: 3vw; flex: 1 1 auto; min-height: 0; align-items: stretch; }
   .joinpage .qrside { flex: 0 0 36%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vh; }

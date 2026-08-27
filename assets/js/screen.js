@@ -457,102 +457,129 @@ window.__themesFallback = `
 /** 第二頁：規則。後台沒放圖就用內建的流程示意圖。 */
 function paintRules() {
   const img = (intro.rulesImg || "").trim();
-  body.innerHTML = `
-    <h2 class="title-gold intro-title">★ 遊戲規則 ★</h2>
-    <div class="rules">
-      <div class="ruleside">
-        <ol>
-          <li>每組推派 <b>一位上台代表</b>，其餘是 <b>台下學員</b>。</li>
-          <li>題目出現後開始 <b>倒數</b>，台下學員在手機上選 A／B／C／D。</li>
-          <li>代表看得到自己這組的 <b>即時選擇比例</b>，再決定最終答案。</li>
-          <li>代表按下 <b>確認送出</b> —— 送出後不能更改，並立刻顯示在螢幕上。</li>
-          <li>代表答對 <b>+1 分</b>。</li>
-          <li>台下學員答對率過半，<b>再 +1 分</b>。</li>
-        </ol>
-        <div class="qr-mini">
-          <div class="qrbox"><img id="s-qr" alt="玩家端 QR Code"></div>
-          <div class="cap">
-            <b>📱 還沒進場的現在就掃</b>
-            <span>${escapeHtml(playerUrl)}</span>
-          </div>
+
+  // 中間欄：規則條列 ＋ 進場 QR
+  const middle = `
+    <div class="ruleside">
+      <ol>
+        <li>每組推派 <b>一位上台代表</b>，其餘是 <b>台下學員</b>。</li>
+        <li>題目出現後開始 <b>倒數</b>，台下學員在手機上選 A／B／C／D。</li>
+        <li>代表看得到自己這組的 <b>即時選擇比例</b>，再決定最終答案。</li>
+        <li>代表按下 <b>確認送出</b> —— 送出後不能更改，並立刻顯示在螢幕上。</li>
+        <li>代表答對 <b>+1 分</b>。</li>
+        <li>台下學員答對率過半，<b>再 +1 分</b>。</li>
+      </ol>
+      <div class="qr-mini">
+        <div class="qrbox"><img id="s-qr" alt="玩家端 QR Code"></div>
+        <div class="cap">
+          <b>📱 還沒進場的現在就掃</b>
+          <span>${escapeHtml(playerUrl)}</span>
         </div>
       </div>
-      <div class="pic" id="s-rulepic">${img
-        ? `<img src="${escapeHtml(img)}" alt="規則說明圖"
-             onerror="this.replaceWith(document.createRange().createContextualFragment(phoneMockHtml()))">`
-        : phoneMockHtml()}</div>
     </div>`;
+
+  // 預設把兩支手機分站左右兩側，中間放規則；
+  // 後台放了自訂規則圖的話就回到「規則在左、圖在右」的兩欄版面。
+  body.innerHTML = `
+    <h2 class="title-gold intro-title">★ 遊戲規則 ★</h2>
+    ${img
+      ? `<div class="rules">
+           ${middle}
+           <div class="pic">
+             <img src="${escapeHtml(img)}" alt="規則說明圖"
+                  onerror="this.replaceWith(document.createRange()
+                    .createContextualFragment(window.__phonesFallback()))">
+           </div>
+         </div>`
+      : `<div class="rules rules-3col">
+           <div class="pic">${phoneMockHtml("member")}</div>
+           ${middle}
+           <div class="pic">${phoneMockHtml("rep")}</div>
+         </div>`}`;
 
   paintQr();
   fitPhones();
 }
 
 /**
- * 規則頁的示意圖：直接用學員端真正的元件樣式組出兩支手機畫面，
+ * 規則頁的示意圖：直接用學員端真正的元件樣式組出手機畫面，
  * 所以跟他們手上看到的一模一樣，之後改樣式也會自動跟著變。
  */
-function phoneMockHtml() {
+function phoneMockHtml(...who) {
+  return `<div class="phonerow">${who.map(w => phoneFigure(w)).join("")}</div>`;
+}
+
+// inline 的 onerror 是在全域執行的，module 內的函式它看不到 —— 得掛到 window 上
+window.__phonesFallback = () => phoneMockHtml("member", "rep");
+
+/** who："member" 台下學員／"rep" 上台代表（紅底，多一塊學員選擇比例） */
+function phoneFigure(who) {
   const opts = [
     ["A", "直接錄音存證"],
     ["B", "找時間好好說"],
     ["C", "貼紙條抗議"],
     ["D", "跟幹部檢舉"]
   ];
-  const optHtml = picked => opts.map(([L, t]) =>
-    `<div class="opt${L === picked ? " picked" : ""}">
+  const optHtml = opts.map(([L, t]) =>
+    `<div class="opt${L === "B" ? " picked" : ""}">
        <span class="letter">${L}</span><span class="label">${t}</span>
      </div>`).join("");
 
-  const bars = [["A", 14], ["B", 57], ["C", 15], ["D", 14]].map(([L, p]) =>
-    `<div class="bar-row"><span class="bar-key">${L}</span>
-       <span class="bar-track"><span class="bar-fill" style="width:${p}%"></span></span>
-       <span class="bar-num">${p}%</span></div>`).join("");
+  const qhead = `
+    <div class="qhead">
+      <span class="qbadge">第 <b>3</b> 題</span>
+      <span class="timer warn">18</span>
+    </div>`;
+
+  if (who === "rep") {
+    const bars = [["A", 14], ["B", 57], ["C", 15], ["D", 14]].map(([L, p]) =>
+      `<div class="bar-row"><span class="bar-key">${L}</span>
+         <span class="bar-track"><span class="bar-fill" style="width:${p}%"></span></span>
+         <span class="bar-num">${p}%</span></div>`).join("");
+
+    return `
+      <figure class="phone rep">
+        <figcaption>🎤 上台代表</figcaption>
+        <div class="phones">
+          <div class="phone-screen">
+            ${qhead}
+            <div class="card" style="margin-bottom:12px;">
+              <strong class="title-gold" style="font-size:15px;">學員的選擇</strong>
+              <div class="bars" style="margin-top:8px;">${bars}</div>
+            </div>
+            <div class="opts">${optHtml}</div>
+            <button class="btn wide" style="margin-top:12px;">確認送出 <b>B</b></button>
+          </div>
+        </div>
+      </figure>`;
+  }
 
   return `
-    <div class="phones" id="s-phones">
-      <figure class="phone">
-        <figcaption>📱 台下學員</figcaption>
+    <figure class="phone member">
+      <figcaption>📱 台下學員</figcaption>
+      <div class="phones">
         <div class="phone-screen">
-          <div class="qhead">
-            <span class="qbadge">第 <b>3</b> 題</span>
-            <span class="timer warn">18</span>
-          </div>
+          ${qhead}
           <div class="qpanel"><p>室友半夜一直講電話，最好的第一步是？</p></div>
-          <div class="opts">${optHtml("B")}</div>
+          <div class="opts">${optHtml}</div>
           <p class="hint" style="margin-top:10px;">已送出 B，截止前都可以改</p>
         </div>
-      </figure>
-
-      <figure class="phone">
-        <figcaption>🎤 上台代表</figcaption>
-        <div class="phone-screen">
-          <div class="qhead">
-            <span class="qbadge">第 <b>3</b> 題</span>
-            <span class="timer warn">18</span>
-          </div>
-          <div class="card" style="margin-bottom:12px;">
-            <strong class="title-gold" style="font-size:15px;">學員的選擇</strong>
-            <div class="bars" style="margin-top:8px;">${bars}</div>
-          </div>
-          <div class="opts">${optHtml("B")}</div>
-          <button class="btn wide" style="margin-top:12px;">確認送出 <b>B</b></button>
-        </div>
-      </figure>
-    </div>`;
+      </div>
+    </figure>`;
 }
 
-/** 兩支手機用原尺寸組好再整體縮到放得下，字級比例才不會跑掉 */
+/** 手機用原尺寸組好再整體縮到放得下，字級比例才不會跑掉。
+    標題留在 .phones 外面不跟著縮，兩支手機的標題大小才會一致。 */
 function fitPhones() {
-  const wrap = $("#s-phones");
-  const box  = $("#s-rulepic");
-  if (!wrap || !box) return;
-  wrap.style.transform = "";
-  const w = wrap.scrollWidth, h = wrap.scrollHeight;
-  if (!w || !h) return;
-  const k = Math.min(box.clientWidth / w, box.clientHeight / h, 1);
-  wrap.style.transform = `scale(${k.toFixed(3)})`;
-  wrap.style.width  = w + "px";
-  wrap.style.height = h + "px";
+  document.querySelectorAll(".rules .phone-screen").forEach(scr => {
+    const box = scr.parentElement;
+    if (!box) return;
+    scr.style.transform = "";
+    const w = scr.offsetWidth, h = scr.offsetHeight;
+    if (!w || !h) return;
+    const k = Math.min(box.clientWidth / w, box.clientHeight / h, 1);
+    scr.style.transform = `scale(${k.toFixed(3)})`;
+  });
 }
 
 /** 第三頁：QR Code + 各組代表就位狀況 */
