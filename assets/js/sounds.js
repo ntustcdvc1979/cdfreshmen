@@ -24,6 +24,7 @@ export async function unlock() {
   // 先把音樂接起來開始緩衝、撞擊聲先解碼好，正式要用時才不會卡住
   if (enabled) {
     quizBgm.prime(); revealBgm.prime(); finalBgm.prime(); wheelBgm.prime();
+    wowSfx.prime();
     for (const c of Object.values(cues)) c.prime();
     loadRevealSfx();
   }
@@ -274,6 +275,57 @@ export function stopCue() {
 export function cuePlaying() {
   return CUE_KINDS.find(k => cues[k].playing()) || null;
 }
+
+// ---------- 放一次就結束的音檔 ----------
+
+/**
+ * 例如轉盤停下來的那一聲。放完會呼叫 onEnd —— 投影頁靠它把背景音樂接回來，
+ * 所以「載不到／放不出來／被喊停」也一定要叫到 onEnd，不然音樂就回不來了。
+ */
+function makeOneShot(file, { volume = 0.9 } = {}) {
+  const t = { on: false, el: null, src: null, gain: null, onEnd: null };
+
+  const fire = () => { t.on = false; const cb = t.onEnd; t.onEnd = null; cb?.(); };
+
+  function ensure() {
+    if (!t.el) {
+      t.el = new Audio(AUDIO(file));
+      t.el.preload = "auto";
+      t.el.addEventListener("ended", fire);
+      t.el.addEventListener("error", fire);   // 檔案不在也要讓音樂接回來
+    }
+    if (!t.src && ctx) {
+      t.src  = ctx.createMediaElementSource(t.el);
+      t.gain = ctx.createGain();
+      t.gain.gain.value = volume;
+      t.src.connect(t.gain).connect(master);
+    }
+    return t.el;
+  }
+
+  return {
+    prime() { ensure(); },
+    playing: () => t.on,
+    start(onEnd) {
+      const el = ensure();
+      t.on = true;
+      t.onEnd = onEnd || null;
+      try { el.currentTime = 0; } catch { /* seek 不動就照樣播 */ }
+      if (t.gain) t.gain.gain.setValueAtTime(volume, ctx.currentTime);
+      else el.volume = volume;
+      el.play().catch(fire);
+    },
+    stop() { t.el?.pause(); fire(); }
+  };
+}
+
+const wowSfx = makeOneShot("wow.m4a", { volume: 0.9 });
+
+/** 轉盤停下來的那一聲。放完（或放不出來）會呼叫 onEnd。 */
+export function wow(onEnd) { wowSfx.start(onEnd); }
+export function stopWow()  { wowSfx.stop(); }
+/** 還在放嗎 —— 投影頁用它決定「保底計時器」要不要再等一下 */
+export function wowPlaying() { return wowSfx.playing(); }
 
 // ---------- 一次性音效（整段解碼，觸發時零延遲） ----------
 

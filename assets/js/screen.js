@@ -114,7 +114,7 @@ function onStateChange() {
 
   if (phase === PHASE.OPEN) {
     snd.stopBgm();
-    snd.startBgm();
+    if (!wheelAudioBusy()) snd.startBgm();
     startTicker();
   } else {
     snd.stopBgm();
@@ -122,10 +122,10 @@ function onStateChange() {
     stage.classList.remove("tense", "shake");
     if (phase === PHASE.LOCKED && lastPhase === PHASE.OPEN) snd.timeUp();
     // 撞擊聲下去，接著鋼琴弦樂鋪在講解底下
-    if (phase === PHASE.REVEAL) { snd.fanfare(); snd.startRevealBgm(); }
+    if (phase === PHASE.REVEAL) { snd.fanfare(); if (!wheelAudioBusy()) snd.startRevealBgm(); }
     if (phase === PHASE.FINAL) {
       if (lastPhase !== PHASE.FINAL) podiumStep = 0;
-      snd.startFinalBgm();          // 排行榜的 funk 墊底
+      if (!wheelAudioBusy()) snd.startFinalBgm();   // 排行榜的 funk 墊底
     }
   }
 
@@ -234,15 +234,35 @@ window.__preload = () => Object.fromEntries(preloadState);
 // ------------------------------------------------------------
 let lastWheelId = null;
 
+/**
+ * 轉盤的聲音走到哪了：
+ *   off      平常
+ *   spinning 轉盤音樂正在放 —— 這段期間其他背景音樂一律不准開
+ *   wow      轉盤停住，正在放那一聲 —— 這段期間連轉盤音樂也不放
+ * 放完 wow 才把原本的背景音樂接回來（此時轉盤還蓋在畫面上）。
+ */
+let wheelAudio = "off";
+const wheelAudioBusy = () => wheelAudio !== "off";
+
+// 音檔缺了或卡住也一定要把音樂接回來，不能讓場子從此變安靜。
+// 先等 WOW_GUARD_MS，還在放就每秒再看一次（音檔多長都放得完），
+// 真的卡住不動了就在 WOW_HARD_MS 收手。
+const WOW_GUARD_MS = 5000;
+const WOW_HARD_MS  = 120000;
+
 function closeWheel() {
   const had = !!document.querySelector(".wheel-overlay");
   document.querySelector(".wheel-overlay")?.remove();
   snd.stopWheelBgm();
-  if (had) resumePhaseBgm();     // 轉盤收掉，把該階段原本的音樂接回來
+  if (!had) return;
+  snd.stopWow();
+  wheelAudio = "off";
+  resumePhaseBgm();              // 轉盤收掉，把該階段原本的音樂接回來
 }
 
 /** 轉盤只留自己的音樂，其他階段的背景音樂（含主持人放的音檔）先全部收掉 */
 function soloWheelBgm() {
+  wheelAudio = "spinning";
   stopCuePlayback();
   clearCueState();
   snd.stopBgm();
@@ -251,12 +271,36 @@ function soloWheelBgm() {
   snd.startWheelBgm();
 }
 
+/** 轉盤停住 → 收掉轉盤音樂，放一聲 wow，放完才把原本的背景音樂接回來 */
+function wheelLanded() {
+  wheelAudio = "wow";
+  snd.stopWheelBgm();
+
+  let restored = false;
+  const restore = () => {
+    if (restored || wheelAudio !== "wow") return;   // 已經被 closeWheel 收掉就別搶
+    restored = true;
+    wheelAudio = "off";
+    resumePhaseBgm();
+  };
+  snd.wow(restore);
+
+  const t0 = Date.now();
+  const guard = () => {
+    if (restored || wheelAudio !== "wow") return;
+    if (snd.wowPlaying() && Date.now() - t0 < WOW_HARD_MS) { setTimeout(guard, 1000); return; }
+    restore();
+  };
+  setTimeout(guard, WOW_GUARD_MS);
+}
+
 /**
  * 轉盤／音檔結束後，依目前階段把背景音樂接回來（start 本身有防重入）。
- * 轉盤還蓋在畫面上就接回轉盤的音樂，不要讓兩首疊在一起。
+ * 轉盤的聲音還在跑就別插隊。
  */
 function resumePhaseBgm() {
-  if (document.querySelector(".wheel-overlay")) { snd.startWheelBgm(); return; }
+  if (wheelAudio === "spinning") { snd.startWheelBgm(); return; }
+  if (wheelAudio === "wow") return;
   const p = state.phase;
   if (p === PHASE.OPEN)        snd.startBgm();
   else if (p === PHASE.REVEAL) snd.startRevealBgm();
@@ -336,6 +380,7 @@ function spinWheel(targetGid) {
     if (p < 1) { requestAnimationFrame(frame); return; }
 
     snd.wheelStop();
+    wheelLanded();
     const res = ov.querySelector("#wheel-result");
     res.className = "wheel-result";
     res.innerHTML = `<span class="who">${escapeHtml(gl[idx].name)}</span>
@@ -1109,8 +1154,9 @@ function paintRevealPage(qid, q) {
   // 翻到別頁再接回來（start／stop 本身都有防重入，每次重畫呼叫都沒差）
   const ownSound = pages[revealPage] === "fullimg"
     && (isVideoUrl((q?.exImgFull || "").trim()) || !!(q?.exAudio || "").trim());
-  if (ownSound) snd.stopRevealBgm();
-  else          snd.startRevealBgm();
+  if (wheelAudioBusy())  { /* 轉盤的聲音正在放，音樂完全不動 */ }
+  else if (ownSound)     snd.stopRevealBgm();
+  else                   snd.startRevealBgm();
 
   ({ answer: paintReveal, fullimg: paintFullImage, standings: paintStandings, dist: paintDistribution })
     [pages[revealPage]](qid, q);
