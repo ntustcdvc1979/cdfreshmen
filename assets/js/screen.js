@@ -10,7 +10,7 @@ import {
   db, auth, ref, onValue, update, onAuthStateChanged,
   PATH, PHASE, LISTS, LETTERS, DEFAULT_LIMIT_SEC, CATEGORIES,
   categoryOf, questionsOf, tallyAllMembers, secondsLeft, isHost, ptsOf,
-  blocksOf, groupBlocks, isSoloMedia, videoEmbed, isVideoUrl, webpSrc, TEXT_SIZE_VH, IMG_SIZE_VH,
+  blocksOf, groupBlocks, isSoloMedia, videoEmbed, isVideoUrl, isAudioUrl, webpSrc, TEXT_SIZE_VH, IMG_SIZE_VH,
   gridColumns, buildScoreboard, categoryMatrix, groupBestCategories, columnWinners,
   wheelPool, $, show, escapeHtml, toSortedList
 } from "./common.js";
@@ -46,7 +46,10 @@ $("#btn-sound").addEventListener("click", async () => {
   await snd.unlock();
   soundOn = true;
   show($("#sound-gate"), false);
+  // 解鎖的當下畫面上可能已經有東西在靜音播了，一併打開聲音
   unmuteThemeVideo();
+  unmuteVideo("#s-fullvid");
+  unmuteVideo("#s-fullaud");
 });
 $("#btn-nosound").addEventListener("click", e => {
   e.preventDefault();
@@ -159,25 +162,31 @@ const preloadState = new Map();     // 網址 → waiting／loading／ready／fa
 let preloadQueue = [];
 let preloadBusy = false;
 
-/** 題目裡用到的本機影片檔 */
-function localVideoUrls() {
+/** 題目裡用到的本機影片與音檔 —— 都先抓下來，翻到那一頁才不用等 */
+function localMediaUrls() {
   const urls = new Set();
-  const add = raw => {
+  const addVideo = raw => {
     const s = (raw || "").trim();
     if (!s || !isVideoUrl(s)) return;
     const v = videoEmbed(s);
     if (v.kind === "file" && v.src) urls.add(v.src);
   };
+  // 外部網址交給瀏覽器自己處理，只預載站內的檔案
+  const addAudio = raw => {
+    const s = (raw || "").trim();
+    if (s && isAudioUrl(s) && !/^(https?:)?\/\//i.test(s)) urls.add(s);
+  };
   for (const q of Object.values(questions || {})) {
-    add(q?.exImgFull);
-    for (const b of blocksOf(q)) if (b.t === "video") add(b.v);
+    addVideo(q?.exImgFull);
+    addAudio(q?.exAudio);
+    for (const b of blocksOf(q)) if (b.t === "video") addVideo(b.v);
   }
   return [...urls];
 }
 
 /** 題目一更新就把新出現的影片排進佇列 */
 function queuePreload() {
-  for (const url of localVideoUrls()) {
+  for (const url of localMediaUrls()) {
     if (preloadState.has(url)) continue;
     preloadState.set(url, "waiting");
     preloadQueue.push(url);
@@ -432,6 +441,7 @@ snd.onCueEnd(() => { stopCuePlayback(); clearCueState(); });
 
 /** 音檔要聽得清楚，其他音樂先全部收掉 */
 function soloCueBgm() {
+  stopExplainAudio();          // 說明音檔也讓開，兩個聲音不要疊在一起
   snd.stopBgm();
   snd.stopRevealBgm();
   snd.stopFinalBgm();
@@ -631,10 +641,20 @@ function showsStandings(qid) {
 
 function revealPages(q) {
   const pages = ["answer"];
-  if ((q?.exImgFull || "").trim()) pages.push("fullimg");
+  // 整頁大圖與說明音檔共用「補充說明」這一頁，兩個都填就是圖片配旁白
+  if ((q?.exImgFull || "").trim() || (q?.exAudio || "").trim()) pages.push("fullimg");
   if (showsStandings(q?.id ?? state.qid)) pages.push("standings");
   pages.push("dist");
   return pages;
+}
+
+/** 現在正停在「補充說明」那一頁嗎 —— 說明音檔只有在那一頁才該響 */
+function onFullPage() {
+  if ((state.phase || PHASE.IDLE) !== PHASE.REVEAL) return false;
+  const q = state.qid ? questions[state.qid] : null;
+  if (!q) return false;
+  const pages = revealPages(q);
+  return pages[Math.min(revealPage, pages.length - 1)] === "fullimg";
 }
 
 const PAGE_NAME = {
@@ -695,6 +715,7 @@ function paint() {
 
   tip.textContent = "";
   stage.querySelector(".confetti")?.remove();
+  if (!onFullPage()) stopExplainAudio();   // 翻走／換題／換階段，說明音檔就收掉
   reportPage();
 
   if (phase === PHASE.FINAL)                                 return paintFinal();
@@ -1084,11 +1105,12 @@ function paintRevealPage(qid, q) {
   const pages = revealPages(q);
   revealPage = Math.min(revealPage, pages.length - 1);
 
-  // 補充說明放影片的那一頁，影片有自己的聲音，講解音樂先讓開；
+  // 補充說明放影片或音檔的那一頁，它自己有聲音，講解音樂先讓開；
   // 翻到別頁再接回來（start／stop 本身都有防重入，每次重畫呼叫都沒差）
-  const onVideo = pages[revealPage] === "fullimg" && isVideoUrl((q?.exImgFull || "").trim());
-  if (onVideo) snd.stopRevealBgm();
-  else         snd.startRevealBgm();
+  const ownSound = pages[revealPage] === "fullimg"
+    && (isVideoUrl((q?.exImgFull || "").trim()) || !!(q?.exAudio || "").trim());
+  if (ownSound) snd.stopRevealBgm();
+  else          snd.startRevealBgm();
 
   ({ answer: paintReveal, fullimg: paintFullImage, standings: paintStandings, dist: paintDistribution })
     [pages[revealPage]](qid, q);
@@ -1181,24 +1203,78 @@ function fitBlocks(el) {
   }
 }
 
+/**
+ * 補充說明那一頁：整頁大圖／影片，外加選填的說明音檔。
+ *
+ * 圖片與音檔可以同時放 —— 大圖鋪滿畫面，旁白在底下播。
+ * 只播一次，不加 loop；而且資料一有更新就會重畫整頁，
+ * 所以內容沒換就不重建 DOM，否則音檔（與影片）會一直跳回開頭重播。
+ */
 function paintFullImage(qid, q) {
   foot.textContent = "補充說明";
 
-  const url = (q.exImgFull || "").trim();
-  if (isVideoUrl(url)) return paintFullVideo(url);
+  const url   = (q.exImgFull || "").trim();
+  const audio = (q.exAudio   || "").trim();
 
-  body.innerHTML = `
-    <div class="fullimg">
-      <img src="${escapeHtml(webpSrc(q.exImgFull))}"
-           data-fallback="${webpSrc(q.exImgFull) !== q.exImgFull ? escapeHtml(q.exImgFull) : ""}"
+  if (isVideoUrl(url)) return paintFullVideo(url);   // 影片自己有聲音，說明音檔就略過
+
+  // 換了題目或換了內容才重建，不然音檔會被重播
+  const key = `${qid}|${url}|${audio}`;
+  const cur = body.querySelector("#s-fullpage");
+  if (cur && cur.dataset.key === key) return;
+
+  const pic = url
+    ? `<img src="${escapeHtml(webpSrc(url))}"
+           data-fallback="${webpSrc(url) !== url ? escapeHtml(url) : ""}"
            alt="補充說明大圖"
-           onerror="window.__imgErr(this, el => el.parentElement.innerHTML='<p class=&quot;hint&quot; style=&quot;font-size:2.6vh&quot;>圖片載不出來，請確認後台填的網址</p>')">
-    </div>`;
+           onerror="window.__imgErr(this, el => el.parentElement.innerHTML='<p class=&quot;hint&quot; style=&quot;font-size:2.6vh&quot;>圖片載不出來，請確認後台填的網址</p>')">`
+    : `<p class="hint" style="font-size:3.2vh;">🔊 播放說明音檔中…</p>`;
+
+  body.innerHTML = `<div class="fullimg" id="s-fullpage" data-key="${escapeHtml(key)}">${pic}</div>`;
+  if (audio) addExplainAudio(audio);
+}
+
+/**
+ * 把說明音檔掛上去。先靜音自動播（不然會被瀏覽器擋掉），解鎖過音效才打開聲音。
+ * 不加 loop —— 播完就停在最後，不會又從頭來一次。
+ */
+function addExplainAudio(src) {
+  const el = document.createElement("audio");
+  el.id = "s-fullaud";
+  el.src = src;
+  el.autoplay = true;
+  el.muted = true;
+  el.preload = "auto";
+  el.addEventListener("error", () => {
+    document.querySelector(".aud-pill")?.remove();
+  });
+  body.appendChild(el);
+
+  showAudioPill();
+  if (soundOn) { el.muted = false; el.volume = 1; el.play?.().catch(() => {}); }
+  el.addEventListener("ended", () => document.querySelector(".aud-pill")?.remove(), { once: true });
+}
+
+/** 音檔沒有畫面，給主持人一個「確實在播」的回饋 */
+function showAudioPill() {
+  document.querySelector(".aud-pill")?.remove();
+  const p = document.createElement("div");
+  p.className = "cue-pill aud-pill";
+  p.textContent = "🔊 說明音檔播放中";
+  stage.appendChild(p);
+}
+
+/** 離開補充說明那一頁時，音檔跟它的小標一起收掉 */
+function stopExplainAudio() {
+  const el = document.getElementById("s-fullaud");
+  if (el) { el.pause(); el.remove(); }
+  document.querySelector(".aud-pill")?.remove();
 }
 
 /**
  * 補充說明放影片：整頁播一次就好，不重播（不加 loop）。
  * 資料一有更新就會重畫整頁，所以影片已經在播就別重建，否則會一直跳回第一幀。
+ * 影片自己有聲音，這時候就不要再疊說明音檔上去。
  */
 function paintFullVideo(url) {
   if (body.querySelector("#s-fullvid")) return;
@@ -1215,6 +1291,7 @@ function paintFullVideo(url) {
 
   if (soundOn && v.kind === "file") unmuteVideo("#s-fullvid");
 }
+
 
 function paintDistribution(qid, q) {
   foot.textContent = "全場作答分布";

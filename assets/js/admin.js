@@ -76,6 +76,16 @@ function paintPreview() {
   }
 }
 
+// 說明音檔的預覽
+$("#ed-exaudio").addEventListener("input", paintAudioPreview);
+function paintAudioPreview() {
+  const url = $("#ed-exaudio").value.trim();
+  show($("#ed-preview-aud"), !!url);
+  const el = $("#ed-preview-aud-el");
+  if (!url) { el.pause(); el.removeAttribute("src"); return; }
+  if (el.getAttribute("src") !== url) { el.pause(); el.src = url; }
+}
+
 // ============================================================
 //  說明頁的排版區塊
 // ============================================================
@@ -309,7 +319,7 @@ function paintQuestions() {
   $("#q-list").innerHTML = list.map((q, i) => {
     const cat = categoryOf(q.cat);
     const blks  = blocksOf(q);
-    const hasEx = blks.length > 0 || !!(q.exImgFull || "").trim();
+    const hasEx = blks.length > 0 || !!(q.exImgFull || "").trim() || !!(q.exAudio || "").trim();
     const nImg  = blks.filter(b => b.t === "img").length;
     const nVid  = blks.filter(b => b.t === "video").length;
     return `
@@ -326,6 +336,7 @@ function paintQuestions() {
         ${blks.length ? `<span class="flag">${blks.length} 個區塊${nImg ? `・${nImg} 圖` : ""}${nVid ? `・${nVid} 影片` : ""}</span>` : ""}
         ${(q.exImgFull || "").trim()
           ? `<span class="flag">${isVideoUrl(q.exImgFull) ? "含整頁影片" : "含整頁大圖"}</span>` : ""}
+        ${(q.exAudio || "").trim() ? `<span class="flag">含說明音檔</span>` : ""}
       </div>
       <div class="row" style="margin-top:10px;">
         <button class="btn ghost mini q-edit">編輯</button>
@@ -365,10 +376,12 @@ function openEditor(qid) {
   // blocksOf 會把舊的 exText / exImg 自動轉成區塊，舊題目不用重編
   edBlocks = blocksOf(q);
   $("#ed-eximgfull").value = q.exImgFull || "";
+  $("#ed-exaudio").value   = q.exAudio || "";
   for (const L of LETTERS) $("#ed-" + L.toLowerCase()).value = q[L.toLowerCase()] || "";
   $("#ed-key").value = (qid === "new" ? "A" : keys[qid]) || "A";
 
   paintPreview();
+  paintAudioPreview();
   show($("#ed-del"), qid !== "new");
   show($("#editor"), true);
   // 一定要等編輯區顯示出來才畫預覽，否則量到的高度是 0，圖片會變成 max-height:0
@@ -405,6 +418,9 @@ $("#ed-save").addEventListener("click", async () => {
 
   const exImgFull = $("#ed-eximgfull").value.trim();
   if (exImgFull) data.exImgFull = exImgFull;
+
+  const exAudio = $("#ed-exaudio").value.trim();
+  if (exAudio) data.exAudio = exAudio;
 
   for (const L of LETTERS) {
     const v = $("#ed-" + L.toLowerCase()).value.trim();

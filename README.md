@@ -196,8 +196,20 @@ GitHub repo → **Settings → Pages** → Source 選 **`GitHub Actions`**（不
      - 本機影片檔放 `assets/video/`；YouTube 需要現場有網路，
        而且瀏覽器可能擋掉自動播放，這時主持人按一下播放鍵就好
 
-   **影片預載**：投影幕一開，就會在背景把這一場題目用到的**本機**影片
-   （`assets/video/` 底下那些）依序抓下來放著，真的翻到那一頁才不會邊播邊等。
+   - **說明音檔**（選填）—— 跟整頁大圖是**同一頁**：大圖鋪滿畫面、音檔在底下播，
+     適合放旁白或一段訪談。
+
+     - **只播一次，不會重播**；翻到別頁就停，翻回來才重新開始
+     - 資料更新造成的重畫不會把音檔跳回開頭
+     - 播的時候講解的背景音樂會自動讓開，畫面下方會有「🔊 說明音檔播放中」
+     - **沒填整頁大圖、只填音檔也可以** —— 那一頁就純粹放音檔
+     - 整頁大圖填的是**影片**時，影片自己有聲音，說明音檔會略過不播
+     - 主持人按「上／下課鐘聲」或「健康操」時，說明音檔會讓開
+     - 檔案放 `assets/audio/`，這裡填 `assets/audio/檔名.mp3`；
+       也可以貼外部音檔直連網址
+
+   **影片與音檔預載**：投影幕一開，就會在背景把這一場題目用到的**本機**影片與音檔
+   （`assets/video/`、`assets/audio/` 底下那些）依序抓下來放著，真的翻到那一頁才不會邊播邊等。
    一次只抓一支，不會跟正在播的開場影片搶頻寬。
    所以**開場前早點把投影頁打開**，讓它有時間把影片抓完。
    想確認進度就在投影頁按 F12 打 `__preload()`，會列出每支影片的狀態
@@ -288,7 +300,7 @@ GitHub repo → **Settings → Pages** → Source 選 **`GitHub Actions`**（不
 - 第一次開會要求按一下「開啟音效」——瀏覽器規定必須有使用者手勢才能出聲。
   按完再按 **F11** 進全螢幕。
 - **公布答案階段**：正解與說明會一起出現；`→` / `←` 翻頁，頁序是
-  「答案與說明 → 補充大圖（有填才有）→ 目前戰況（每 5 題才有）→ 全場作答分布」，
+  「答案與說明 → 補充說明（整頁大圖／影片／音檔，有填才有）→ 目前戰況（每 5 題才有）→ 全場作答分布」，
   頁尾會顯示左右各是什麼。
 - **最終畫面**：排行榜。`空白鍵` 依序公布第三名 → 第二名 → 第一名（第一名會灑彩帶），
   再按一次進入類別分析。`←` 可以倒回上一步重播。**只公布前三名。**
@@ -313,6 +325,7 @@ GitHub repo → **Settings → Pages** → Source 選 **`GitHub Actions`**（不
 | 公布答案 | 上揚和弦 |
 | 公布排行榜 | 五音勝利音 |
 | 主持人按「上／下課鐘聲」／「健康操」 | 放 `assets/audio/bell.m4a` ／ `lucy.m4a`，其他背景音樂先收掉，放完接回來 |
+| 補充說明那一頁有說明音檔 | 放後台填的音檔，只播一次；講解背景音樂先讓開，翻走就停 |
 
 BGM 用「預先排程」送出音符，所以主執行緒卡頓不會讓節拍飄掉。
 想換曲風就改 [`assets/js/sounds.js`](assets/js/sounds.js) 最上面的
@@ -368,7 +381,8 @@ assets/
   js/player.js  host.js  screen.js  admin.js
   img/hero.webp  logo.webp  themes.webp
   img/explain/          （自己建）說明圖片放這裡，一律用 .webp
-  audio/                背景音樂、音效檔，以及主持人現場放的 bell.m4a / lucy.m4a
+  audio/                背景音樂、音效檔、主持人現場放的 bell.m4a / lucy.m4a，
+                        以及題目說明用的音檔
   video/                本機影片檔（說明區塊選「影片」時可以指到這裡）
 ```
 
@@ -379,7 +393,7 @@ assets/
 /config/groups/{gid}           { name, order }
 /config/intro                  { rulesImg }             ← 規則頁的圖（選填）
 /questions/{qid}               { order, text, a,b,c,d, cat, list, pts,
-                                 exText, exImg, exImgFull }
+                                 exText, exImg, exImgFull, exAudio }
                                                         ← 公開可讀，不含正解
 /answerKey/{qid}               "A"                      ← 只有公布後才可讀
 /state                         { phase, list, qid, openedAt, limitSec,

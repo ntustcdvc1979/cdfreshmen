@@ -93,7 +93,7 @@ export function authErrorText(e) {
 //  /config/groups/{gid}           = { name, order }
 //  /config/intro                  = { rulesImg }                     ← 規則頁的圖（選填）
 //  /questions/{qid}               = { order, text, a,b,c,d, cat, list, pts,
-//                                     blocks:[…], exImgFull }         ← 公開可讀，不含正解
+//                                     blocks:[…], exImgFull, exAudio } ← 公開可讀，不含正解
 //     blocks = 說明頁的排版區塊，一格一個：
 //       { t:"text"|"img"|"head", v:內容, w:"full"|"half", size:1~5, align:"left"|"center" }
 //     半行的區塊會自動並排成兩欄。舊的 exText / exImg 仍然讀得到（會自動轉成區塊）。
@@ -235,6 +235,18 @@ export function isVideoUrl(url) {
   const u = (url || "").trim();
   if (!u) return false;
   return videoEmbed(u).kind === "embed" || VIDEO_EXT.test(u);
+}
+
+const AUDIO_EXT = /\.(mp3|m4a|aac|wav|oga|opus|flac)(\?|#|$)/i;
+
+/**
+ * 這個網址看起來是音檔嗎？ —— 常見的音訊副檔名。
+ * 「說明音檔」那一欄用它擋掉填錯（貼成圖片或影片網址）的情況。
+ */
+export function isAudioUrl(url) {
+  const u = (url || "").trim();
+  if (!u) return false;
+  return AUDIO_EXT.test(u);
 }
 
 /**

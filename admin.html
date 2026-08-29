@@ -118,8 +118,8 @@
     <div class="card stack">
       <strong class="title-gold" style="font-size:20px;">開場畫面</strong>
       <p class="hint" style="text-align:left; margin:0;">
-        投影幕在待機時有三頁，用 <b>→</b> / <b>←</b> 翻：
-        六大主題 → 遊戲規則 → 掃碼進場（含各組代表就位狀況）。
+        投影幕在待機時有五頁，用 <b>→</b> / <b>←</b> 翻（主持人控制台也翻得動）：<br>
+        黑畫面 → 開場影片 → 主視覺 → 遊戲規則 → 掃碼進場（含各組代表就位狀況）。
       </p>
       <div class="field">
         <label for="in-rulesimg">規則頁的圖片網址（選填）</label>
@@ -210,6 +210,13 @@
         <img id="ed-preview-full-img" alt="整頁大圖預覽" style="max-width:100%; max-height:200px; border-radius:10px; box-shadow:0 0 0 2px rgba(53,168,255,.45);">
         <div id="ed-preview-full-vid" class="hidden" style="max-width:360px; margin:0 auto; aspect-ratio:16/9; border-radius:10px; overflow:hidden; background:#000; box-shadow:0 0 0 2px rgba(53,168,255,.45);"></div>
       </div>
+      <div class="field">
+        <label for="ed-exaudio">說明音檔（跟整頁大圖同一頁一起播，選填）</label>
+        <input id="ed-exaudio" placeholder="assets/audio/youtuber.mp3">
+      </div>
+      <div id="ed-preview-aud" class="hidden" style="margin:4px 0;">
+        <audio id="ed-preview-aud-el" controls preload="none" style="width:100%;"></audio>
+      </div>
 
       <p class="hint" style="text-align:left; margin:0;">
         兩個圖片欄位都是選填，可以只填一個、也可以都填。
@@ -218,6 +225,15 @@
         圖片有兩種放法：①貼一個外部圖片直連網址；
         ②把檔案放進 repo 的 <code>assets/img/explain/</code>，這裡填
         <code>assets/img/explain/檔名.webp</code>。
+      </p>
+      <p class="hint" style="text-align:left; margin:0;">
+        <b style="color:var(--gold-lt)">說明音檔</b>跟整頁大圖是<b>同一頁</b>：大圖鋪滿畫面、音檔在底下播，
+        適合放旁白或一段訪談。<b>只播一次，不會重播</b>，翻到別頁就停；
+        播的時候講解背景音樂會自動讓開，畫面下方會有「🔊 說明音檔播放中」。<br>
+        沒填整頁大圖、只填音檔也可以 —— 那一頁就純粹放音檔。
+        整頁大圖填的是<b>影片</b>時，影片自己有聲音，說明音檔就會略過不播。<br>
+        檔案放進 repo 的 <code>assets/audio/</code>，這裡填
+        <code>assets/audio/檔名.mp3</code>（也可以貼外部音檔直連網址）。
       </p>
 
       <div class="row">
