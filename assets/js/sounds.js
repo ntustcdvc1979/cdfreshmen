@@ -24,6 +24,7 @@ export async function unlock() {
   // 先把音樂接起來開始緩衝、撞擊聲先解碼好，正式要用時才不會卡住
   if (enabled) {
     quizBgm.prime(); revealBgm.prime(); finalBgm.prime(); wheelBgm.prime();
+    for (const c of Object.values(cues)) c.prime();
     loadRevealSfx();
   }
   return enabled;
@@ -183,6 +184,96 @@ export function stopFinalBgm()  { finalBgm.stop();  }
 /** 加倍轉盤 → upbeat 墊在轉盤的答答聲底下 */
 export function startWheelBgm() { wheelBgm.start(); }
 export function stopWheelBgm()  { wheelBgm.stop();  }
+
+// ---------- 主持人隨時可以放的音檔（鐘聲、健康操） ----------
+//  跟 BGM 不一樣的地方：不循環、放完就自己結束，而且主持人可以中途喊停。
+//  沒按過「開啟音效」的話 Web Audio 接不起來，就退回 <audio> 自己的音量播 ——
+//  「不要聲音，直接進入」也是一次點擊，多半還是放得出來。
+
+/** 放完（或被喊停）時通知外面 —— 投影頁要拿它把 state.cue 收掉 */
+let cueEndCb = null;
+export function onCueEnd(fn) { cueEndCb = fn; }
+
+function makeCue(file, { volume = 0.85, fadeOut = 0.35 } = {}) {
+  const t = { on: false, el: null, src: null, gain: null };
+
+  function ensure() {
+    if (!t.el) {
+      t.el = new Audio(AUDIO(file));
+      t.el.preload = "auto";
+      t.el.addEventListener("ended", () => { t.on = false; cueEndCb?.(); });
+    }
+    if (!t.src && ctx) {
+      t.src  = ctx.createMediaElementSource(t.el);
+      t.gain = ctx.createGain();
+      t.gain.gain.value = volume;
+      t.src.connect(t.gain).connect(master);
+    }
+    return t.el;
+  }
+
+  return {
+    /** 解鎖時先接起來開始緩衝，按下去才不會卡在下載 */
+    prime() { ensure(); },
+
+    playing: () => t.on,
+
+    start() {
+      const el = ensure();
+      t.on = true;
+      try { el.currentTime = 0; } catch { /* seek 不動就照樣播 */ }
+
+      if (t.gain) {
+        const now = ctx.currentTime;
+        t.gain.gain.cancelScheduledValues(now);
+        t.gain.gain.setValueAtTime(volume, now);   // 上一次淡出留下的值要收回來
+      } else {
+        el.volume = volume;
+      }
+      el.play().catch(() => {});
+    },
+
+    stop() {
+      if (!t.on) return;
+      t.on = false;
+      const el = t.el;
+      if (!el) return;
+      if (!t.gain) { el.pause(); return; }
+
+      const now = ctx.currentTime;
+      t.gain.gain.cancelScheduledValues(now);
+      t.gain.gain.setValueAtTime(Math.max(t.gain.gain.value, 0.0001), now);
+      t.gain.gain.exponentialRampToValueAtTime(0.0001, now + fadeOut);
+      // 淡出跑完才 pause；期間又被重新叫起來就不要停
+      setTimeout(() => { if (!t.on) el.pause(); }, fadeOut * 1000 + 60);
+    }
+  };
+}
+
+const cues = {
+  bell:     makeCue("bell.m4a", { volume: 0.9 }),
+  exercise: makeCue("lucy.m4a", { volume: 0.85 })
+};
+
+export const CUE_KINDS = Object.keys(cues);
+
+/** 放一段音檔。同一時間只會有一段，換一段會先把前一段收掉。 */
+export function startCue(kind) {
+  if (!cues[kind]) return false;
+  stopCue();
+  cues[kind].start();
+  return true;
+}
+
+/** 主持人喊停，或要換另一段 */
+export function stopCue() {
+  for (const c of Object.values(cues)) c.stop();
+}
+
+/** 現在正在放哪一段（沒有就是 null） */
+export function cuePlaying() {
+  return CUE_KINDS.find(k => cues[k].playing()) || null;
+}
 
 // ---------- 一次性音效（整段解碼，觸發時零延遲） ----------
 

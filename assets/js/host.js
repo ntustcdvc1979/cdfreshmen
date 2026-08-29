@@ -165,6 +165,43 @@ $("#btn-wheel-clear").addEventListener("click", async () => {
   toast("已取消加倍");
 });
 
+// ---- 投影幕播放（鐘聲／健康操） ----
+//  主持人這邊只負責寫 state.cue，真正出聲的是投影頁。
+//  放完投影頁會自己把 cue 清掉，按鈕就會跳回「播放」。
+const CUE_LABEL = {
+  bell:     { name: "上／下課鐘聲", icon: "🔔" },
+  exercise: { name: "健康操",       icon: "🤸" }
+};
+
+for (const kind of Object.keys(CUE_LABEL)) {
+  $(`#btn-cue-${kind}`).addEventListener("click", () => toggleCue(kind));
+}
+
+async function toggleCue(kind) {
+  const playing = state.cue?.kind || null;
+  if (playing === kind) {                       // 再按一次同一顆 = 喊停
+    await update(ref(db, PATH.state), { cue: null });
+    toast(`已停止${CUE_LABEL[kind].name}`);
+    return;
+  }
+  await update(ref(db, PATH.state), { cue: { id: Date.now(), kind } });
+  toast(`投影幕播放：${CUE_LABEL[kind].name}`);
+}
+
+function paintCue() {
+  const playing = state.cue?.kind || null;
+  const tag = $("#cue-tag");
+  if (playing) { tag.textContent = "播放中：" + CUE_LABEL[playing].name; tag.className = "pill live"; }
+  else         { tag.textContent = "沒有在播"; tag.className = "pill"; }
+
+  for (const [kind, { name, icon }] of Object.entries(CUE_LABEL)) {
+    const btn = $(`#btn-cue-${kind}`);
+    const on  = playing === kind;
+    btn.textContent = on ? `⏹ 停止${name}` : `${icon} ${name}`;
+    btn.className   = on ? "btn" : "btn ghost";
+  }
+}
+
 $("#btn-prev").addEventListener("click", () => step(-1));
 $("#btn-next").addEventListener("click", () => step(+1));
 
@@ -350,6 +387,7 @@ function paint() {
   else if (thisQ)   { tag.textContent = "本題 ×2："   + (groups[thisQ]?.name   || "?"); tag.className = "pill live"; }
   else              { tag.textContent = "尚未抽"; tag.className = "pill"; }
 
+  paintCue();
   paintMatrix(board);
   paintReps(gl);
 }

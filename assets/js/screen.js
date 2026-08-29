@@ -3,11 +3,11 @@
 //  需要主持人身分（原始作答只有 /admins 名單讀得到）。
 //  在同一個瀏覽器開過 host.html 登入後，這頁會自動沿用登入狀態。
 //
-//  鍵盤：→ / ← 翻頁，空白鍵在最終畫面依序公布名次。
+//  鍵盤：→ / ← 翻頁（開場：全黑 → 影片 → 主視覺 → 規則 → 掃碼），空白鍵在最終畫面依序公布名次。
 // ============================================================
 
 import {
-  db, auth, ref, onValue, onAuthStateChanged,
+  db, auth, ref, onValue, update, onAuthStateChanged,
   PATH, PHASE, LISTS, LETTERS, DEFAULT_LIMIT_SEC, CATEGORIES,
   categoryOf, questionsOf, tallyAllMembers, secondsLeft, isHost, ptsOf,
   blocksOf, groupBlocks, isSoloMedia, videoEmbed, isVideoUrl, webpSrc, TEXT_SIZE_VH, IMG_SIZE_VH,
@@ -31,7 +31,7 @@ const STANDINGS_EVERY = 5;
 const STANDINGS_TOP   = 5;
 const PODIUM_TOP      = 3;
 
-let introPage  = 0;   // 開場：0 六大主題 / 1 規則 / 2 QR + 代表就位
+let introPage  = 0;   // 開場：0 全黑 / 1 開場影片 / 2 主視覺 / 3 規則 / 4 QR + 代表就位
 let revealPage = 0;   // 公布：答案與說明 →（補充大圖）→（目前戰況）→ 全場分布
 let podiumStep = 0;   // 排行榜：0 還沒開始 → 3 全部揭曉 → 4 類別分析
 
@@ -89,7 +89,7 @@ onAuthStateChanged(auth, async user => {
   onValue(ref(db, PATH.doubles),     s => { doubles   = s.val() || {}; paint(); });
   onValue(ref(db, PATH.reps),        s => { reps      = s.val() || {}; onReps(); paint(); });
   onValue(ref(db, PATH.repAnswers),  s => { repAns    = s.val() || {}; onRepAnswers(); paint(); });
-  onValue(ref(db, PATH.state),       s => { state = s.val() || {}; onStateChange(); onWheel(); paint(); });
+  onValue(ref(db, PATH.state),       s => { state = s.val() || {}; onStateChange(); onWheel(); onCue(); paint(); });
 });
 
 // ------------------------------------------------------------
@@ -232,16 +232,22 @@ function closeWheel() {
   if (had) resumePhaseBgm();     // 轉盤收掉，把該階段原本的音樂接回來
 }
 
-/** 轉盤只留自己的音樂，其他階段的背景音樂先全部收掉 */
+/** 轉盤只留自己的音樂，其他階段的背景音樂（含主持人放的音檔）先全部收掉 */
 function soloWheelBgm() {
+  stopCuePlayback();
+  clearCueState();
   snd.stopBgm();
   snd.stopRevealBgm();
   snd.stopFinalBgm();
   snd.startWheelBgm();
 }
 
-/** 轉盤結束後，依目前階段把背景音樂接回來（start 本身有防重入） */
+/**
+ * 轉盤／音檔結束後，依目前階段把背景音樂接回來（start 本身有防重入）。
+ * 轉盤還蓋在畫面上就接回轉盤的音樂，不要讓兩首疊在一起。
+ */
 function resumePhaseBgm() {
+  if (document.querySelector(".wheel-overlay")) { snd.startWheelBgm(); return; }
   const p = state.phase;
   if (p === PHASE.OPEN)        snd.startBgm();
   else if (p === PHASE.REVEAL) snd.startRevealBgm();
@@ -374,6 +380,74 @@ function onRepAnswers() {
 }
 
 // ------------------------------------------------------------
+//  主持人放的音檔（上／下課鐘聲、健康操）
+// ------------------------------------------------------------
+//  主持人控制台只寫 state.cue = { id, kind }，出聲的是這一頁。
+//  放的時候現場的背景音樂先收掉，放完（或主持人喊停）再接回來。
+//  自然放完會把 state.cue 清掉，控制台那顆按鈕才會跳回「播放」。
+
+const CUE_PILL = {
+  bell:     "🔔 上／下課鐘聲",
+  exercise: "🤸 健康操"
+};
+
+let lastCueId = null;
+let cueKind   = null;      // 這一頁現在正在放的是哪一段
+
+function onCue() {
+  const c = state.cue;
+  if (!c || !c.id) {                 // 主持人喊停，或放完後被清掉
+    if (lastCueId !== null) { lastCueId = null; stopCuePlayback(); }
+    return;
+  }
+  if (c.id === lastCueId) return;    // 同一次播放的重複通知
+  lastCueId = c.id;
+  startCuePlayback(c.kind);
+}
+
+function startCuePlayback(kind) {
+  if (!snd.startCue(kind)) return;   // 不認得的種類就當作沒這回事
+  cueKind = kind;
+  soloCueBgm();
+  showCuePill(kind);
+}
+
+/** 只停這一頁的播放，不動資料庫 */
+function stopCuePlayback() {
+  if (!cueKind) return;
+  cueKind = null;
+  snd.stopCue();
+  document.querySelector(".cue-pill")?.remove();
+  resumePhaseBgm();
+}
+
+/** 把 state.cue 收掉 —— 控制台的按鈕靠它跳回「播放」 */
+function clearCueState() {
+  if (!state.cue) return;
+  update(ref(db, PATH.state), { cue: null }).catch(() => {});
+}
+
+/** 音檔放到自然結束 */
+snd.onCueEnd(() => { stopCuePlayback(); clearCueState(); });
+
+/** 音檔要聽得清楚，其他音樂先全部收掉 */
+function soloCueBgm() {
+  snd.stopBgm();
+  snd.stopRevealBgm();
+  snd.stopFinalBgm();
+  snd.stopWheelBgm();
+}
+
+/** 台下看得到現在在放什麼，主持人也才知道投影幕真的收到了 */
+function showCuePill(kind) {
+  document.querySelector(".cue-pill")?.remove();
+  const el = document.createElement("div");
+  el.className = "cue-pill";
+  el.textContent = CUE_PILL[kind] || "🔊 播放中";
+  stage.appendChild(el);
+}
+
+// ------------------------------------------------------------
 //  鍵盤
 // ------------------------------------------------------------
 addEventListener("keydown", e => {
@@ -392,7 +466,7 @@ addEventListener("keydown", e => {
   }
 
   if (phase === PHASE.IDLE) {
-    if (e.key === "ArrowRight") { e.preventDefault(); introPage = Math.min(2, introPage + 1); paint(); }
+    if (e.key === "ArrowRight") { e.preventDefault(); introPage = Math.min(INTRO_LAST, introPage + 1); paint(); }
     if (e.key === "ArrowLeft")  { e.preventDefault(); introPage = Math.max(0, introPage - 1); paint(); }
     return;
   }
@@ -488,7 +562,10 @@ const PAGE_NAME = {
   standings: "目前戰況",
   dist:      "全場作答分布"
 };
-const INTRO_NAME = ["六大主題", "遊戲規則", "掃碼進場"];
+const INTRO_NAME = ["黑畫面", "開場影片", "主視覺", "遊戲規則", "掃碼進場"];
+const INTRO_LAST = INTRO_NAME.length - 1;
+// 前三頁都是整片鋪滿的畫面（黑幕、影片、主視覺），頂部列與頁尾要收起來
+const INTRO_BLEED = 2;
 
 function scoreboardNow() {
   return buildScoreboard(groups, questions, keys, allResp, repAns, state.revealed, LISTS.MAIN, doubles);
@@ -530,8 +607,10 @@ function paint() {
     dblEl.style.display = "none";
   }
 
-  // 六大主題那一頁要滿版，頂部列與頁尾都收起來
-  stage.classList.toggle("bleed", phase === PHASE.IDLE && introPage === 0);
+  // 開場前三頁要滿版，頂部列與頁尾都收起來；第一頁再多蓋一層全黑
+  const introBleed = phase === PHASE.IDLE && introPage <= INTRO_BLEED;
+  stage.classList.toggle("bleed",    introBleed);
+  stage.classList.toggle("blackout", phase === PHASE.IDLE && introPage === 0);
 
   tip.textContent = "";
   stage.querySelector(".confetti")?.remove();
@@ -543,20 +622,31 @@ function paint() {
 }
 
 // ============================================================
-//  開場三頁
+//  開場五頁
 // ============================================================
 function paintIntro() {
   foot.textContent = "開場";
-  const prev = introPage > 0 ? "← " + INTRO_NAME[introPage - 1] : "";
-  const next = introPage < 2 ? INTRO_NAME[introPage + 1] + " →" : "";
+  const prev = introPage > 0          ? "← " + INTRO_NAME[introPage - 1] : "";
+  const next = introPage < INTRO_LAST ? INTRO_NAME[introPage + 1] + " →" : "";
   tip.textContent = [prev, next].filter(Boolean).join("　　");
 
-  if (introPage === 0) return paintThemes();
-  if (introPage === 1) return paintRules();
+  if (introPage === 0) return paintBlack();
+  if (introPage === 1) return paintThemes();
+  if (introPage === 2) return paintCover();
+  if (introPage === 3) return paintRules();
   return paintJoin();
 }
 
-/** 第一頁：六大主題。整張主視覺直接滿版鋪滿投影畫面。 */
+/**
+ * 第一頁：全黑。
+ * 開場前投影機就先亮著，但台下什麼都看不到 —— 主持人按 → 才進影片。
+ */
+function paintBlack() {
+  if (!body.firstChild) return;    // 已經空的就不要每次資料更新都動 DOM
+  body.innerHTML = "";
+}
+
+/** 第二頁：開場影片。整支影片滿版鋪滿投影畫面。 */
 function paintThemes() {
   // 資料一有更新就會重畫整頁；影片已經在播就別重建，否則會一直跳回第一幀
   if (body.querySelector("#s-themevid, .themes")) return;
@@ -569,6 +659,16 @@ function paintThemes() {
   if (soundOn) unmuteThemeVideo();
 }
 
+/** 第三頁：主視覺。影片放完停在這張，主持人開場就是對著它講。 */
+function paintCover() {
+  if (body.querySelector("#s-cover")) return;   // 免得每次資料更新都閃一下
+
+  body.innerHTML = `
+    <img class="bleed-img" id="s-cover" src="assets/img/hero.webp"
+         alt="大學星攻略 — 創造我的大學價值"
+         onerror="window.__imgFail(this)">`;
+}
+
 // 圖載不出來時的備援：用類別色重畫六張卡，不會開天窗
 window.__themesFallback = `
   <div class="themes">
@@ -578,7 +678,7 @@ window.__themesFallback = `
       </div>`).join("")}
   </div>`;
 
-/** 第二頁：規則。後台沒放圖就用內建的流程示意圖。 */
+/** 第四頁：規則。後台沒放圖就用內建的流程示意圖。 */
 function paintRules() {
   const img = (intro.rulesImg || "").trim();
 
@@ -719,7 +819,7 @@ function fitPhones() {
   });
 }
 
-/** 第三頁：QR Code + 各組代表就位狀況 */
+/** 第五頁：QR Code + 各組代表就位狀況 */
 function paintJoin() {
   const gl = toSortedList(groups);
   const ready_ = gl.filter(g => reps[g.id]).length;

@@ -43,7 +43,7 @@
 
   .body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 2vh; min-height: 0; }
 
-  /* 六大主題那一頁：整張圖鋪滿投影畫面，連頂部列與頁尾都收起來 */
+  /* 開場影片與主視覺那幾頁：整張鋪滿投影畫面，連頂部列與頁尾都收起來 */
   .stage.bleed { padding: 0; }
   .stage.bleed .top,
   .stage.bleed .foot { display: none; }
@@ -53,6 +53,10 @@
     object-fit: cover;
     display: block;
   }
+
+  /* 開場第一頁：整片全黑，連底圖的星空都蓋掉。按 → 才進影片。 */
+  .stage.blackout { background: #000; }
+  .stage.blackout .sweep { display: none; }
 
   .foot { display: flex; align-items: center; justify-content: space-between; gap: 2vw;
           color: var(--txt-dim); font-size: 2vh; flex: 0 0 auto; }
@@ -542,6 +546,24 @@
   }
   @keyframes wheel-in { from { opacity: 0; } }
 
+  /* ---------- 主持人放的音檔（鐘聲／健康操） ---------- */
+  /* 只在底部掛一條小標，不要擋到正在投影的內容 */
+  .cue-pill {
+    position: fixed; left: 50%; bottom: 3vh; z-index: 70;
+    font-size: 2.4vh; font-weight: 900; letter-spacing: .04em; line-height: 1;
+    color: #4a2c00;
+    padding: 1.2vh 2.4vw; border-radius: 999px;
+    background: linear-gradient(180deg, #fff2b8, var(--gold) 55%, #dc9400);
+    box-shadow: 0 0 2.6vh rgba(255,200,31,.7);
+    animation: cue-in .35s cubic-bezier(.2,1.6,.4,1);
+  }
+  @keyframes cue-in {
+    from { opacity: 0; transform: translate(-50%, 1.6vh); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+  }
+  /* 動畫跑完之後要留住置中的位移 */
+  .cue-pill { transform: translateX(-50%); }
+
   .wheel-overlay h2 { font-size: 5.4vh; margin: 0; }
   /* 標題裡的 Double 用紅色大字，遠遠就知道這一輪是加倍 */
   .wheel-overlay h2 .dbl-word {
@@ -649,7 +671,8 @@
     <h2 class="title-gold" style="font-size:4.8vh; margin:0 0 1.4vh;">投影統計頁</h2>
     <p class="hint" style="font-size:2.4vh; margin:0 0 3vh;">
       瀏覽器要求先有一次點擊才能播放聲音，<b style="color:var(--gold-lt)">開場影片的音樂</b>也一樣。<br>
-      按下之後請按 <b style="color:var(--gold-lt)">F11</b> 進入全螢幕。
+      按下之後請按 <b style="color:var(--gold-lt)">F11</b> 進入全螢幕。<br>
+      進去之後畫面是<b style="color:var(--gold-lt)">全黑</b>的 —— 按 <b style="color:var(--gold-lt)">→</b> 才開始放開場影片。
     </p>
     <button class="btn" id="btn-sound">🔊 開啟音效並開始</button>
     <p class="hint" style="font-size:2vh; margin-top:2vh;">
