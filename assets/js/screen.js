@@ -89,7 +89,7 @@ onAuthStateChanged(auth, async user => {
   onValue(ref(db, PATH.doubles),     s => { doubles   = s.val() || {}; paint(); });
   onValue(ref(db, PATH.reps),        s => { reps      = s.val() || {}; onReps(); paint(); });
   onValue(ref(db, PATH.repAnswers),  s => { repAns    = s.val() || {}; onRepAnswers(); paint(); });
-  onValue(ref(db, PATH.state),       s => { state = s.val() || {}; onStateChange(); onWheel(); onCue(); paint(); });
+  onValue(ref(db, PATH.state),       s => { state = s.val() || {}; onStateChange(); onWheel(); onCue(); onNav(); syncPageReport(); paint(); });
 });
 
 // ------------------------------------------------------------
@@ -448,8 +448,11 @@ function showCuePill(kind) {
 }
 
 // ------------------------------------------------------------
-//  鍵盤
+//  鍵盤與遠端翻頁
 // ------------------------------------------------------------
+//  投影機那台按 → / ←，跟主持人從控制台按「投影幕下一頁」，
+//  走的都是 stepPage() 這一條路，兩邊行為一定一致。
+
 addEventListener("keydown", e => {
   // 轉盤蓋著的時候先處理它：Esc 手動關掉，其餘按鍵不要穿透到底下的頁面
   if (document.querySelector(".wheel-overlay")) {
@@ -459,26 +462,104 @@ addEventListener("keydown", e => {
 
   const phase = state.phase || PHASE.IDLE;
 
-  if (phase === PHASE.FINAL) {
-    if ([" ", "ArrowRight", "Enter"].includes(e.key)) { e.preventDefault(); stepPodium(+1); }
-    if (e.key === "ArrowLeft")                        { e.preventDefault(); stepPodium(-1); }
-    return;
+  // 排行榜那頁習慣用空白鍵一格一格揭曉，Enter 也接受
+  if (phase === PHASE.FINAL && [" ", "Enter"].includes(e.key)) {
+    e.preventDefault(); stepPage(+1); return;
   }
+  if (e.key === "ArrowRight") { e.preventDefault(); stepPage(+1); }
+  if (e.key === "ArrowLeft")  { e.preventDefault(); stepPage(-1); }
+});
+
+/** dir：+1 下一頁／-1 上一頁。這個階段沒有分頁就什麼都不做。 */
+function stepPage(dir) {
+  if (document.querySelector(".wheel-overlay")) return;   // 轉盤蓋著就先不翻
+
+  const phase = state.phase || PHASE.IDLE;
+
+  if (phase === PHASE.FINAL) return stepPodium(dir);
 
   if (phase === PHASE.IDLE) {
-    if (e.key === "ArrowRight") { e.preventDefault(); introPage = Math.min(INTRO_LAST, introPage + 1); paint(); }
-    if (e.key === "ArrowLeft")  { e.preventDefault(); introPage = Math.max(0, introPage - 1); paint(); }
+    const next = clamp(introPage + dir, 0, INTRO_LAST);
+    if (next === introPage) return;
+    introPage = next;
+    paint();
     return;
   }
 
   if (phase === PHASE.REVEAL) {
     const q = state.qid ? questions[state.qid] : null;
     if (!q) return;
-    const last = revealPages(q).length - 1;
-    if (e.key === "ArrowRight") { e.preventDefault(); revealPage = Math.min(last, revealPage + 1); paint(); }
-    if (e.key === "ArrowLeft")  { e.preventDefault(); revealPage = Math.max(0, revealPage - 1); paint(); }
+    const next = clamp(revealPage + dir, 0, revealPages(q).length - 1);
+    if (next === revealPage) return;
+    revealPage = next;
+    paint();
   }
-});
+}
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/** 主持人從控制台按翻頁 —— state.nav 換了新的 id 就翻一頁 */
+let lastNavId = null;
+let navReady  = false;
+
+function onNav() {
+  const n = state.nav;
+
+  // 剛開頁面：把現在的指令記下來就好，不要把上一輪留著的補翻一次
+  if (!navReady) { navReady = true; lastNavId = n?.id ?? null; return; }
+
+  if (!n || !n.id || n.id === lastNavId) return;
+  lastNavId = n.id;
+  stepPage(n.dir < 0 ? -1 : +1);
+}
+
+/**
+ * 把投影幕現在停在第幾頁寫回 state，控制台的翻頁鈕才不是盲按。
+ *
+ * 只有頁碼真的變了才寫。這裡刻意不去讀 state.screenPage 來比對 ——
+ * paint() 在 state 訂閱掛好之前就會先跑，那時 state 還是空的，
+ * 拿它當條件會變成「寫了又覺得沒寫到、再寫一次」的無窮迴圈。
+ * state 被整包蓋掉的情況交給 syncPageReport() 處理。
+ */
+let lastPageReport = null;
+
+function reportPage() {
+  const label = currentPageLabel();
+  if (label === lastPageReport) return;
+  lastPageReport = label;
+  update(ref(db, PATH.state), { screenPage: label }).catch(() => {});
+}
+
+/**
+ * state 被整包蓋掉時（例如主持人按「清除所有作答紀錄」）screenPage 會跟著不見。
+ * 把記憶清掉，下一次 paint() 就會補寫回去，控制台才不會一直顯示「投影幕還沒連上」。
+ * 只在真的不見時才動手，寫回去之後就不會再觸發，不會來回打架。
+ */
+function syncPageReport() {
+  if (lastPageReport !== null && state.screenPage == null) lastPageReport = null;
+}
+
+function currentPageLabel() {
+  const phase = state.phase || PHASE.IDLE;
+
+  if (phase === PHASE.IDLE)
+    return `開場 ${introPage + 1}/${INTRO_NAME.length}　${INTRO_NAME[introPage]}`;
+
+  if (phase === PHASE.REVEAL) {
+    const q = state.qid ? questions[state.qid] : null;
+    if (!q) return "公布答案";
+    const pages = revealPages(q);
+    const i = Math.min(revealPage, pages.length - 1);
+    return `公布答案 ${i + 1}/${pages.length}　${PAGE_NAME[pages[i]] || ""}`;
+  }
+
+  if (phase === PHASE.FINAL) {
+    const names = ["還沒開始", "第三名", "第二名", "第一名", "類別分析"];
+    return `排行榜 ${podiumStep + 1}/${PODIUM_TOP + 2}　${names[podiumStep] || ""}`;
+  }
+
+  return "";      // 出題／截止中沒有分頁
+}
 
 function stepPodium(dir) {
   const next = Math.max(0, Math.min(PODIUM_TOP + 1, podiumStep + dir));
@@ -614,6 +695,7 @@ function paint() {
 
   tip.textContent = "";
   stage.querySelector(".confetti")?.remove();
+  reportPage();
 
   if (phase === PHASE.FINAL)                                 return paintFinal();
   if (phase === PHASE.REVEAL && q)                           return paintRevealPage(qid, q);

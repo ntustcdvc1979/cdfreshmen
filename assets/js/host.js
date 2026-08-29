@@ -165,6 +165,37 @@ $("#btn-wheel-clear").addEventListener("click", async () => {
   toast("已取消加倍");
 });
 
+// ---- 投影幕翻頁 ----
+//  控制台只寫 state.nav = { id, dir }，真正翻頁的是投影頁 ——
+//  跟在投影機那台按 → / ← 走的是同一條路。
+//  投影幕會把自己停在第幾頁寫回 state.screenPage，這裡直接顯示。
+$("#btn-page-prev").addEventListener("click", () => navScreen(-1));
+$("#btn-page-next").addEventListener("click", () => navScreen(+1));
+
+async function navScreen(dir) {
+  await update(ref(db, PATH.state), { nav: { id: Date.now(), dir } });
+}
+
+// 出題／截止中投影幕沒有分頁，翻頁鈕就先關起來
+const PAGED_PHASES = [PHASE.IDLE, PHASE.REVEAL, PHASE.FINAL];
+
+function paintPageNav() {
+  const phase  = state.phase || PHASE.IDLE;
+  const paged  = PAGED_PHASES.includes(phase);
+  const where  = (state.screenPage || "").trim();
+
+  const tag = $("#page-tag");
+  tag.textContent = paged ? (where || "投影幕還沒連上") : "這個階段沒有分頁";
+  tag.className   = paged && where ? "pill live" : "pill";
+
+  $("#btn-page-prev").disabled = !paged;
+  $("#btn-page-next").disabled = !paged;
+
+  $("#page-hint").textContent = paged
+    ? (phase === PHASE.FINAL ? "排行榜是一次揭曉一個名次，按「下一頁」往下跑。" : "")
+    : "出題與截止中投影幕只有一頁，公布答案或回到待機之後才翻得動。";
+}
+
 // ---- 投影幕播放（鐘聲／健康操） ----
 //  主持人這邊只負責寫 state.cue，真正出聲的是投影頁。
 //  放完投影頁會自己把 cue 清掉，按鈕就會跳回「播放」。
@@ -387,6 +418,7 @@ function paint() {
   else if (thisQ)   { tag.textContent = "本題 ×2："   + (groups[thisQ]?.name   || "?"); tag.className = "pill live"; }
   else              { tag.textContent = "尚未抽"; tag.className = "pill"; }
 
+  paintPageNav();
   paintCue();
   paintMatrix(board);
   paintReps(gl);
