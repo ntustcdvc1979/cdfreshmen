@@ -82,7 +82,7 @@ onAuthStateChanged(auth, async user => {
   onValue(ref(db, "/.info/serverTimeOffset"), s => { timeOffset = s.val() || 0; });
   onValue(ref(db, PATH.groups),      s => { groups    = s.val() || {}; paint(); });
   onValue(ref(db, PATH.intro),       s => { intro     = s.val() || {}; paint(); });
-  onValue(ref(db, PATH.questions),   s => { questions = s.val() || {}; paint(); });
+  onValue(ref(db, PATH.questions),   s => { questions = s.val() || {}; queuePreload(); paint(); });
   onValue(ref(db, PATH.answerKey),   s => { keys      = s.val() || {}; paint(); });
   onValue(ref(db, PATH.responses),   s => { allResp   = s.val() || {}; paint(); });
   onValue(ref(db, PATH.leaderboard), s => { board     = s.val();       paint(); });
@@ -135,6 +135,90 @@ function onStateChange() {
   lastPhase = phase;
   lastQid = qid;
 }
+
+// ------------------------------------------------------------
+//  影片預載
+//  ------------------------------------------------------------
+//  投影機一開頁面就把這一場會用到的本機影片先抓下來放著，
+//  真的翻到那一頁才不會邊播邊等。
+//  ・一次只抓一支，免得跟正在播的影片搶頻寬
+//  ・抓好的 <video> 不移除，資料才留得住
+//  ・開場主題影片自己會載，不用排隊
+//  ・YouTube／Vimeo 是外部嵌入，沒辦法預載，只能靠現場網路
+// ------------------------------------------------------------
+const PRELOAD_TIMEOUT_MS = 90000;
+
+const preloadBox = document.createElement("div");
+preloadBox.id = "s-preload";
+preloadBox.setAttribute("aria-hidden", "true");
+preloadBox.style.cssText =
+  "position:absolute;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;";
+document.body.appendChild(preloadBox);
+
+const preloadState = new Map();     // 網址 → waiting／loading／ready／failed／slow
+let preloadQueue = [];
+let preloadBusy = false;
+
+/** 題目裡用到的本機影片檔 */
+function localVideoUrls() {
+  const urls = new Set();
+  const add = raw => {
+    const s = (raw || "").trim();
+    if (!s || !isVideoUrl(s)) return;
+    const v = videoEmbed(s);
+    if (v.kind === "file" && v.src) urls.add(v.src);
+  };
+  for (const q of Object.values(questions || {})) {
+    add(q?.exImgFull);
+    for (const b of blocksOf(q)) if (b.t === "video") add(b.v);
+  }
+  return [...urls];
+}
+
+/** 題目一更新就把新出現的影片排進佇列 */
+function queuePreload() {
+  for (const url of localVideoUrls()) {
+    if (preloadState.has(url)) continue;
+    preloadState.set(url, "waiting");
+    preloadQueue.push(url);
+  }
+  pumpPreload();
+}
+
+function pumpPreload() {
+  if (preloadBusy) return;
+  const url = preloadQueue.shift();
+  if (!url) return;
+
+  preloadBusy = true;
+  preloadState.set(url, "loading");
+
+  const v = document.createElement("video");
+  v.preload = "auto";
+  v.muted = true;
+  v.playsInline = true;
+  v.dataset.url = url;
+
+  let settled = false;
+  const done = how => {
+    if (settled) return;
+    settled = true;
+    preloadState.set(url, how);
+    preloadBusy = false;
+    pumpPreload();
+  };
+  v.addEventListener("canplaythrough", () => done("ready"), { once: true });
+  v.addEventListener("error",          () => done("failed"), { once: true });
+  // 網路太慢就先換下一支，別卡住整條隊伍（已經抓到的部分還是留著）
+  setTimeout(() => done("slow"), PRELOAD_TIMEOUT_MS);
+
+  preloadBox.appendChild(v);
+  v.src = url;
+  v.load();
+}
+
+/** 在投影頁的 console 打 __preload() 就能看每支影片的預載狀態 */
+window.__preload = () => Object.fromEntries(preloadState);
 
 // ------------------------------------------------------------
 //  加倍轉盤
