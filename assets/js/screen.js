@@ -30,10 +30,13 @@ const tip   = $("#s-tip");
 const STANDINGS_EVERY = 5;
 const STANDINGS_TOP   = 5;
 const PODIUM_TOP      = 3;
+// 名次揭曉完先回到開場第三頁那張主視覺，最後才是類別分析
+const FINAL_COVER     = PODIUM_TOP + 1;
+const FINAL_MATRIX    = PODIUM_TOP + 2;
 
 let introPage  = 0;   // 開場：0 全黑 / 1 開場影片 / 2 主視覺 / 3 規則 / 4 QR + 代表就位
 let revealPage = 0;   // 公布：答案與說明 →（補充大圖）→（目前戰況）→ 全場分布
-let podiumStep = 0;   // 排行榜：0 還沒開始 → 3 全部揭曉 → 4 類別分析
+let podiumStep = 0;   // 排行榜：0 還沒開始 → 3 全部揭曉 → 4 主視覺 → 5 類別分析
 
 // ------------------------------------------------------------
 //  音效解鎖
@@ -609,15 +612,15 @@ function currentPageLabel() {
   }
 
   if (phase === PHASE.FINAL) {
-    const names = ["還沒開始", "第三名", "第二名", "第一名", "類別分析"];
-    return `排行榜 ${podiumStep + 1}/${PODIUM_TOP + 2}　${names[podiumStep] || ""}`;
+    const names = ["還沒開始", "第三名", "第二名", "第一名", "主視覺", "類別分析"];
+    return `排行榜 ${podiumStep + 1}/${FINAL_MATRIX + 1}　${names[podiumStep] || ""}`;
   }
 
   return "";      // 出題／截止中沒有分頁
 }
 
 function stepPodium(dir) {
-  const next = Math.max(0, Math.min(PODIUM_TOP + 1, podiumStep + dir));
+  const next = Math.max(0, Math.min(FINAL_MATRIX, podiumStep + dir));
   if (next === podiumStep) return;
   podiumStep = next;
   if (dir > 0 && podiumStep >= 1 && podiumStep <= PODIUM_TOP) {
@@ -753,9 +756,10 @@ function paint() {
     dblEl.style.display = "none";
   }
 
-  // 開場前三頁要滿版，頂部列與頁尾都收起來；第一頁再多蓋一層全黑
+  // 開場前三頁與最後那張主視覺要滿版，頂部列與頁尾都收起來；第一頁再多蓋一層全黑
   const introBleed = phase === PHASE.IDLE && introPage <= INTRO_BLEED;
-  stage.classList.toggle("bleed",    introBleed);
+  const finalBleed = phase === PHASE.FINAL && podiumStep === FINAL_COVER;
+  stage.classList.toggle("bleed",    introBleed || finalBleed);
   stage.classList.toggle("blackout", phase === PHASE.IDLE && introPage === 0);
 
   tip.textContent = "";
@@ -1401,14 +1405,16 @@ function paintStandings(qid) {
 function paintFinal() {
   const rows = board?.rows || scoreboardNow().rows;
 
-  if (podiumStep > PODIUM_TOP) return paintMatrixScreen();
+  // 名次揭曉完 → 主視覺（跟開場第三頁同一張）→ 類別分析
+  if (podiumStep === FINAL_COVER)  { foot.textContent = "結束畫面"; return paintCover(); }
+  if (podiumStep >= FINAL_MATRIX)  return paintMatrixScreen();
 
   foot.textContent = "排行榜";
   tip.textContent = podiumStep === 0
     ? "按空白鍵開始公布 →"
     : podiumStep < PODIUM_TOP
       ? `按空白鍵公布第 ${PODIUM_TOP - podiumStep} 名 →`
-      : "按空白鍵看類別分析 →";
+      : "按空白鍵看主視覺 →";
 
   const top = rows.slice(0, PODIUM_TOP);
   // 版面順序是 2 - 1 - 3，揭曉順序是 3 → 2 → 1
@@ -1460,7 +1466,7 @@ function dropConfetti() {
 
 function paintMatrixScreen() {
   foot.textContent = "類別分析";
-  tip.textContent  = "← 按空白鍵回到排行榜";
+  tip.textContent  = "← 按空白鍵回到主視覺";
 
   const mx = categoryMatrix(scoreboardNow());
   if (!mx.cats.length || !mx.rows.length) {
