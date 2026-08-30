@@ -499,6 +499,9 @@
   /* ============================================================
      排行榜（最終前三名，逐一揭曉）
      ============================================================ */
+  /* 標題比其他頁再大一級，最後一排也看得清楚 */
+  .podium-title { font-size: 9vh; line-height: 1.1; text-align: center; }
+
   .podium { display: flex; align-items: flex-end; justify-content: center; gap: 3vw;
             flex: 1 1 auto; min-height: 0; padding-bottom: 1vh; }
   .place { display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
@@ -506,20 +509,20 @@
   .place.shown { animation: place-rise .85s cubic-bezier(.16,1.2,.3,1) forwards; }
   @keyframes place-rise { to { opacity: 1; transform: translateY(0); } }
 
-  .place .medal { font-size: 7.4vh; line-height: 1; margin-bottom: .5vh;
+  .place .medal { font-size: 6.6vh; line-height: 1; margin-bottom: .4vh;
     font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
-  .place .gname { font-size: 6.8vh; font-weight: 900; line-height: 1.08; text-align: center;
-                  margin-bottom: .6vh; max-width: 100%; }
-  .place .score { font-size: 5.2vh; font-weight: 900; margin-bottom: .4vh; color: var(--gold-lt); }
-  .place .detail { font-size: 2.5vh; color: var(--txt-dim); margin-bottom: 1vh; }
+  .place .gname { font-size: 6vh; font-weight: 900; line-height: 1.08; text-align: center;
+                  margin-bottom: .5vh; max-width: 100%; }
+  .place .score { font-size: 4.4vh; font-weight: 900; margin-bottom: .3vh; color: var(--gold-lt); }
+  .place .detail { font-size: 2.3vh; color: var(--txt-dim); margin-bottom: .4vh; }
   .place .block {
     width: 100%; display: grid; place-items: center;
     font-size: 7.4vh; font-weight: 900; color: rgba(255,255,255,.3);
     border-radius: 1.4vh 1.4vh 0 0;
   }
-  .place.p1 .block { height: 24vh; background: linear-gradient(180deg, #ffe07a, #d99a00); box-shadow: 0 0 6vh rgba(255,200,31,.75); }
-  .place.p2 .block { height: 17.5vh; background: linear-gradient(180deg, #e8eef7, #9aa9bd); box-shadow: 0 0 4vh rgba(200,215,235,.5); }
-  .place.p3 .block { height: 12vh; background: linear-gradient(180deg, #e3a76b, #a2632a); box-shadow: 0 0 4vh rgba(210,140,70,.5); }
+  .place.p1 .block { height: 50vh; background: linear-gradient(180deg, #ffe07a, #d99a00); box-shadow: 0 0 6vh rgba(255,200,31,.75); }
+  .place.p2 .block { height: 34vh; background: linear-gradient(180deg, #e8eef7, #9aa9bd); box-shadow: 0 0 4vh rgba(200,215,235,.5); }
+  .place.p3 .block { height: 23vh; background: linear-gradient(180deg, #e3a76b, #a2632a); box-shadow: 0 0 4vh rgba(210,140,70,.5); }
   .place.p1 .gname { color: var(--gold); text-shadow: 0 0 3vh rgba(255,200,31,.7); }
   .place.p2 .gname { color: #dfe8f5; }
   .place.p3 .gname { color: #f0c095; }

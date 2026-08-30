@@ -1419,7 +1419,7 @@ function paintFinal() {
   ];
 
   body.innerHTML = `
-    <h2 class="title-gold intro-title" style="margin:0 0 .8vh;">★ 排行榜 ★</h2>
+    <h2 class="title-gold podium-title" style="margin:0 0 .8vh;">★ 排行榜 ★</h2>
     <div class="podium">
       ${layout.map(({ rank, cls, medal }) => {
         const r = top[rank - 1];
